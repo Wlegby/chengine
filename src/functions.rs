@@ -155,11 +155,6 @@ pub fn fen_positions_to_bitboards(
                     }
                     'k' => {
                         boards.king |= 1 << idx;
-                        pieces.push(Piece {
-                            white: c.is_uppercase(),
-                            _type: PType::King,
-                            position_idx: idx,
-                        });
                     }
                     'q' => {
                         boards.queen |= 1 << idx;
