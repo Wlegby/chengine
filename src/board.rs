@@ -145,8 +145,10 @@ impl State {
         let king_diagonal = EMPTY_PSEUDO_BISHOP[king_idx];
         let king_all = king_straight | king_diagonal;
 
-        let king_s_b = BLOCKED_ROOK[king_idx]
-            [pext(self.all_pieces, remove_border(EMPTY_PSEUDO_ROOK[king_idx])) as usize];
+        let king_s_b = BLOCKED_ROOK[king_idx][pext(
+            self.all_pieces,
+            remove_border_rook(EMPTY_PSEUDO_ROOK[king_idx], king_idx as u8),
+        ) as usize];
         let king_d_b = BLOCKED_BISHOP[king_idx][pext(
             self.all_pieces,
             remove_border(EMPTY_PSEUDO_BISHOP[king_idx]),
@@ -154,9 +156,9 @@ impl State {
         let king_a_b = king_s_b | king_d_b;
 
         let (rooks, bishops, queens) = if white {
-            (self.white.rook, self.white.bishop, self.white.queen)
-        } else {
             (self.black.rook, self.black.bishop, self.black.queen)
+        } else {
+            (self.white.rook, self.white.bishop, self.white.queen)
         };
 
         let mut rook = rooks & king_straight;
@@ -167,10 +169,14 @@ impl State {
 
         while rook != 0 {
             let idx = rook.trailing_zeros() as usize;
-            let moves = BLOCKED_ROOK[idx]
-                [pext(self.all_pieces, remove_border(EMPTY_PSEUDO_ROOK[idx])) as usize];
+            let moves = BLOCKED_ROOK[idx][pext(
+                self.all_pieces,
+                remove_border_rook(EMPTY_PSEUDO_ROOK[idx], idx as u8),
+            ) as usize];
 
-            pins.push((moves & king_s_b).trailing_zeros() as usize);
+            if moves & king_s_b != 0 {
+                pins.push((moves & king_s_b).trailing_zeros() as usize);
+            }
 
             rook &= rook - 1;
         }

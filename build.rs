@@ -365,7 +365,7 @@ pub const fn generate_blocked_rook(sq: u64, blockers: u64) -> u64 {
         i -= 1;
         let bit = 1 << (r * 8 + i);
         attacks |= bit;
-        if !((blockers & bit) != 0) {
+        if (blockers & bit) != 0 {
             break;
         }
     }
