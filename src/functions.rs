@@ -1,9 +1,112 @@
 use crate::board::ColorBoards;
+use crate::board::Move;
 use crate::board::PType;
 use crate::board::Piece;
+use crate::constants::PROMOTION_BISHOP;
+use crate::constants::PROMOTION_KNIGHT;
+use crate::constants::PROMOTION_QUEEN;
+use crate::constants::PROMOTION_ROOK;
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
+
+pub fn uci_to_move(uci: &str) -> Move {
+    let col_from = match uci.chars().nth(0).expect("Expected valid uci") {
+        'a' => 0,
+        'b' => 1,
+        'c' => 2,
+        'd' => 3,
+        'e' => 4,
+        'f' => 5,
+        'g' => 6,
+        'h' => 7,
+        _ => panic!("Expected valid uci"),
+    };
+
+    let row_from = uci
+        .chars()
+        .nth(1)
+        .expect("Expected valid uci")
+        .to_string()
+        .parse::<u16>()
+        .expect("Expected valid uci")
+        - 1;
+
+    let col_to = match uci.chars().nth(2).expect("Expected valid uci") {
+        'a' => 0,
+        'b' => 1,
+        'c' => 2,
+        'd' => 3,
+        'e' => 4,
+        'f' => 5,
+        'g' => 6,
+        'h' => 7,
+        _ => panic!("Expected valid uci"),
+    };
+
+    let row_to = uci
+        .chars()
+        .nth(3)
+        .expect("Expected valid uci")
+        .to_string()
+        .parse::<u16>()
+        .expect("Expected valid uci")
+        - 1;
+
+    let promotion = if let Some(c) = uci.chars().nth(4) {
+        match c {
+            'q' => PROMOTION_QUEEN,
+            'r' => PROMOTION_ROOK,
+            'b' => PROMOTION_BISHOP,
+            'k' => PROMOTION_KNIGHT,
+            _ => panic!("Expected valid uci"),
+        }
+    } else {
+        0
+    };
+
+    let from = col_from + row_from * 8;
+    let to = (col_to + row_to * 8) << 6;
+
+    promotion | to | from
+}
+
+pub fn move_to_uci(_move: Move) -> String {
+    let (prom, to, from) = (
+        _move & (0b1111 << 12),
+        (_move & (0b111111 << 6)) >> 6,
+        _move & 0b111111,
+    );
+
+    fn idx_to_uci(idx: u16) -> String {
+        let r = idx / 8;
+        let c = idx % 8;
+
+        let col = match c {
+            0 => "a",
+            1 => "b",
+            2 => "c",
+            3 => "d",
+            4 => "e",
+            5 => "f",
+            6 => "g",
+            7 => "h",
+            _ => panic!("Expected the index to be in range"),
+        };
+
+        format!("{}{}", col, (r + 1).to_string())
+    }
+
+    let promotion = match prom {
+        PROMOTION_QUEEN => "q",
+        PROMOTION_BISHOP => "b",
+        PROMOTION_KNIGHT => "k",
+        PROMOTION_ROOK => "r",
+        _ => "",
+    };
+
+    format!("{}{}{}", idx_to_uci(from), idx_to_uci(to), promotion)
+}
 
 pub fn pext(blockers: u64, moves: u64) -> u64 {
     if is_x86_feature_detected!("bmi2") {
@@ -104,6 +207,7 @@ pub fn fen_pos_notation_to_sq_index(pos: &str) -> u64 {
 pub fn fen_positions_to_bitboards(
     fen: &str,
     pieces: &mut Vec<Piece>,
+    castling: &str,
 ) -> (ColorBoards, ColorBoards) {
     let mut white = ColorBoards::default();
     let mut black = ColorBoards::default();
@@ -171,6 +275,20 @@ pub fn fen_positions_to_bitboards(
             } else {
                 idx += c.to_string().parse::<u64>().expect("expected number");
             }
+        }
+    }
+
+    for c in castling.chars() {
+        let board = if c.is_uppercase() {
+            &mut white
+        } else {
+            &mut black
+        };
+
+        if c.to_ascii_lowercase() == 'k' {
+            board.castle_k = true
+        } else if c.to_ascii_lowercase() == 'q' {
+            board.castle_q = true
         }
     }
 

@@ -28,9 +28,12 @@ pub struct ColorBoards {
     pub queen: u64,
     pub king: u64,
     pub all: u64,
+    pub attacks: u64,
+    pub castle_k: bool,
+    pub castle_q: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PType {
     Pawn,
     Rook,
@@ -41,10 +44,15 @@ pub enum PType {
 }
 
 // 0000-000000-000000
-//    prom to   from
+// prom   to    from
 pub type Move = u16;
 
-pub fn get_moves_from_move_board(mut move_board: u64, idx: u64) -> Vec<Move> {
+pub fn get_moves_from_move_board(
+    mut move_board: u64,
+    idx: u64,
+    _type: PType,
+    white_move: bool,
+) -> Vec<Move> {
     let mut moves = Vec::new();
 
     let mut indices = Vec::new();
@@ -59,9 +67,26 @@ pub fn get_moves_from_move_board(mut move_board: u64, idx: u64) -> Vec<Move> {
     }
 
     for index in indices {
+        let last_row = if white_move { index >= 56 } else { index <= 7 };
+        let promotion = _type == PType::Pawn && last_row;
+
         let from = idx as u16;
         let to = (index as u16) << 6;
-        moves.push(from | to);
+
+        if promotion {
+            for p in [
+                PROMOTION_QUEEN,
+                PROMOTION_BISHOP,
+                PROMOTION_KNIGHT,
+                PROMOTION_ROOK,
+            ] {
+                moves.push(p | to | from)
+            }
+
+            continue;
+        }
+
+        moves.push(to | from);
     }
 
     moves
@@ -91,6 +116,18 @@ impl Default for State {
 }
 
 impl State {
+    pub fn make_move(&mut self, _move: Move) {
+        let from = _move & 0b111111;
+        let to = (_move & (0b111111 << 6)) >> 6;
+        let prom = match _move & (0b1111 << 12) {
+            PROMOTION_QUEEN => Some(PType::Queen),
+            PROMOTION_KNIGHT => Some(PType::Knight),
+            PROMOTION_BISHOP => Some(PType::Bishop),
+            PROMOTION_ROOK => Some(PType::Rook),
+            _ => None,
+        };
+    }
+
     pub fn from_fen(fen: &str) -> Self {
         let mut pieces = Vec::new();
 
@@ -111,7 +148,7 @@ impl State {
             .parse()
             .expect("Expected a full move clock number");
 
-        let (white, black) = fen_positions_to_bitboards(pos, &mut pieces);
+        let (white, black) = fen_positions_to_bitboards(pos, &mut pieces, cast);
         let all_pieces = white.all | black.all;
 
         let white_to_move = to_move == "w";
@@ -307,47 +344,118 @@ impl State {
         moves
     }
 
-    pub fn get_all_moves(&self) -> (Vec<Move>, Vec<Move>) {
-        let mut white_moves = Vec::new();
-        let mut black_moves = Vec::new();
-
-        let mut white_board_tot: u64 = 0;
-        let mut black_board_tot: u64 = 0;
-
-        let wpins = self.get_pins(true);
-        let bpins = self.get_pins(false);
+    pub fn get_moves(&mut self) -> Vec<Move> {
+        let mut moves = Vec::new();
+        let mut all_w_attacks: u64 = 0;
+        let mut all_b_attacks: u64 = 0;
+        let pins = self.get_pins(self.white_to_move);
 
         for piece in &self.pieces_list {
-            let pins = if piece.white { &wpins } else { &bpins };
+            let (board, attacks) =
+                self.get_legal_move_board(piece.position_idx, piece._type, piece.white);
+
+            if piece.white {
+                all_w_attacks |= attacks;
+                if !self.white_to_move {
+                    continue;
+                }
+            } else {
+                all_b_attacks |= attacks;
+                if self.white_to_move {
+                    continue;
+                }
+            }
 
             if pins.contains(&(piece.position_idx as usize)) {
                 continue;
             }
-            let (board, attacks) =
-                self.get_legal_move_board(piece.position_idx, piece._type, piece.white);
 
-            let moves = get_moves_from_move_board(board, piece.position_idx);
+            let _move = get_moves_from_move_board(
+                board,
+                piece.position_idx,
+                piece._type,
+                self.white_to_move,
+            );
 
-            if piece.white {
-                white_moves.extend(moves);
-                white_board_tot |= attacks;
+            moves.extend(_move);
+        }
+
+        self.white.attacks = all_w_attacks;
+        self.black.attacks = all_b_attacks;
+
+        let (idx, other_king) = if self.white_to_move {
+            (
+                self.white.king.trailing_zeros() as u64,
+                self.black.king.trailing_zeros() as usize,
+            )
+        } else {
+            (
+                self.black.king.trailing_zeros() as u64,
+                self.white.king.trailing_zeros() as usize,
+            )
+        };
+
+        let other_attacks = if self.white_to_move {
+            self.black.attacks
+        } else {
+            self.white.attacks
+        };
+
+        let king_board = self.king_moves(idx, self.white_to_move)
+            & !other_attacks
+            & !EMPTY_PSEUDO_KING[other_king];
+
+        moves.extend(get_moves_from_move_board(
+            king_board,
+            idx,
+            PType::King,
+            self.white_to_move,
+        ));
+
+        let (king, queen) = self.get_castling();
+
+        if king {
+            let _move = if self.white_to_move {
+                WHITE_KING_CASTLE
             } else {
-                black_moves.extend(moves);
-                black_board_tot |= attacks;
+                BLACK_KING_CASTLE
+            };
+            moves.push(_move)
+        }
+        if queen {
+            let _move = if self.white_to_move {
+                WHITE_QUEEN_CASTLE
+            } else {
+                BLACK_QUEEN_CASTLE
+            };
+            moves.push(_move)
+        }
+
+        moves
+    }
+
+    pub fn get_castling(&self) -> (bool, bool) {
+        let (board, other, shift) = if self.white_to_move {
+            (self.white, self.black, 0)
+        } else {
+            (self.black, self.white, 56)
+        };
+
+        let mut castle = (false, false);
+
+        if board.castle_k {
+            if (0b1110000 << shift) & other.attacks == 0
+                && (0b1100000 << shift) & self.all_pieces == 0
+            {
+                castle.0 = true
+            }
+        }
+        if board.castle_q {
+            if (0b1100 << shift) & other.attacks == 0 && (0b1110 << shift) & self.all_pieces == 0 {
+                castle.1 = true
             }
         }
 
-        let widx = self.white.king.trailing_zeros() as u64;
-        let bidx = self.black.king.trailing_zeros() as u64;
-
-        let w_king_board =
-            self.king_moves(widx, true) & !black_board_tot & !EMPTY_PSEUDO_KING[bidx as usize];
-        let b_king_board =
-            self.king_moves(bidx, false) & !white_board_tot & !EMPTY_PSEUDO_KING[widx as usize];
-
-        white_moves.extend(get_moves_from_move_board(w_king_board, widx));
-        black_moves.extend(get_moves_from_move_board(b_king_board, bidx));
-
-        (white_moves, black_moves)
+        castle
     }
 }
