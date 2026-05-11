@@ -456,6 +456,13 @@ impl State {
         let mut moves = Vec::new();
         let mut all_w_attacks: u64 = 0;
         let mut all_b_attacks: u64 = 0;
+
+        let (board, other) = if self.white_to_move {
+            (self.white, self.black)
+        } else {
+            (self.black, self.white)
+        };
+
         let pins = self.get_pins(self.white_to_move);
 
         for (idx, piece) in self.pieces_list.iter().enumerate() {
