@@ -4,7 +4,6 @@ use crate::*;
 pub struct Piece {
     pub white: bool,
     pub _type: PType,
-    pub position_idx: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -16,7 +15,7 @@ pub struct State {
     pub white_to_move: bool,
     pub half_move_clock: usize,
     pub full_move_clock: usize,
-    pub pieces_list: Vec<Piece>,
+    pub pieces_list: [Option<Piece>; 64],
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -116,9 +115,14 @@ impl Default for State {
 }
 
 impl State {
+    pub fn update_all(&mut self) {
+        self.white.update_all();
+        self.black.update_all();
+        self.all_pieces = self.white.all | self.black.all;
+    }
     pub fn make_move(&mut self, _move: Move) {
-        let from = _move & 0b111111;
-        let to = (_move & (0b111111 << 6)) >> 6;
+        let from = _move as usize & 0b111111;
+        let to = (_move as usize & (0b111111 << 6)) >> 6;
         let prom = match _move & (0b1111 << 12) {
             PROMOTION_QUEEN => Some(PType::Queen),
             PROMOTION_KNIGHT => Some(PType::Knight),
@@ -126,10 +130,115 @@ impl State {
             PROMOTION_ROOK => Some(PType::Rook),
             _ => None,
         };
+
+        let p = self.pieces_list[from];
+
+        let (color_board, other_color) = if self.white_to_move {
+            (&mut self.white, &mut self.black)
+        } else {
+            (&mut self.black, &mut self.white)
+        };
+
+        self.en_passant = 0;
+
+        let mut reset_clock = false;
+
+        if let Some(mut piece) = p {
+            // not king moves
+
+            if piece._type == PType::Pawn {
+                reset_clock = true;
+                if prom.is_some() {
+                    piece._type = prom.unwrap();
+                    // if moves two forward update en_passant
+                    if from.abs_diff(to) == 16 {
+                        self.en_passant = 1 << (from + to) / 2
+                    }
+                }
+            }
+
+            self.pieces_list[to] = Some(piece);
+            self.pieces_list[from] = None;
+
+            if (other_color.pawn
+                | other_color.rook
+                | other_color.knight
+                | other_color.bishop
+                | other_color.queen)
+                & 1 << to
+                != 0
+            {
+                reset_clock = true;
+                // capture happened
+                // remove the taken piece
+                other_color.pawn &= !(1 << to);
+                other_color.rook &= !(1 << to);
+                other_color.knight &= !(1 << to);
+                other_color.bishop &= !(1 << to);
+                other_color.queen &= !(1 << to);
+            }
+
+            // get the to-piece board
+            // add the correct piece to the board
+            match piece._type {
+                PType::Pawn => {
+                    color_board.pawn &= !(1 << from as u64);
+                    color_board.pawn |= 1 << to as u64;
+                }
+                PType::Rook => {
+                    color_board.rook &= !(1 << from as u64);
+                    color_board.rook |= 1 << to as u64;
+                }
+                PType::Bishop => {
+                    color_board.bishop &= !(1 << from as u64);
+                    color_board.bishop |= 1 << to as u64;
+                }
+                PType::Knight => {
+                    color_board.knight &= !(1 << from as u64);
+                    color_board.knight |= 1 << to as u64;
+                }
+                PType::Queen => {
+                    color_board.queen &= !(1 << from as u64);
+                    color_board.queen |= 1 << to as u64;
+                }
+                PType::King => panic!("Kings are not supposed to exist here"),
+            }
+        } else {
+            // king moves
+            if from.abs_diff(to) == 2 {
+                // if caslte
+                let shift = if self.white_to_move { 0 } else { 56 };
+                if from < to {
+                    // king-side
+                    color_board.king = 1 << to as u64;
+                    color_board.rook &= !(0b10000000 << shift);
+                    color_board.rook |= 0b100000 << shift;
+                } else {
+                    // queen-side
+                    color_board.king = 1 << to as u64;
+                    color_board.rook &= !(0b1 << shift);
+                    color_board.rook |= 0b1000 << shift;
+                }
+            } else {
+                color_board.king = 1 << to as u64;
+                self.pieces_list[to] = None;
+            }
+        }
+
+        if reset_clock {
+            self.half_move_clock = 0
+        } else {
+            self.half_move_clock += 1;
+        }
+        if !self.white_to_move {
+            self.full_move_clock += 1;
+        }
+        self.update_all();
+        self.white_to_move = !self.white_to_move;
     }
 
     pub fn from_fen(fen: &str) -> Self {
-        let mut pieces = Vec::new();
+        let mut pieces: [Option<Piece>; 64] = [None; 64];
 
         let parts: Vec<&str> = fen.split_whitespace().collect();
         let (pos, to_move, cast, en_pass, half_move, full_move) =
@@ -214,11 +323,10 @@ impl State {
             if moves & king_s_b != 0 {
                 pins.push((moves & king_s_b).trailing_zeros() as usize);
             }
-
-            rook &= rook - 1;
         }
+        rook &= rook - 1;
         while bishop != 0 {
-            let idx = rook.trailing_zeros() as usize;
+            let idx = bishop.trailing_zeros() as usize;
             let moves = BLOCKED_BISHOP[idx]
                 [pext(self.all_pieces, remove_border(EMPTY_PSEUDO_BISHOP[idx])) as usize];
 
@@ -227,7 +335,7 @@ impl State {
             bishop &= bishop - 1;
         }
         while queen != 0 {
-            let idx = rook.trailing_zeros() as usize;
+            let idx = queen.trailing_zeros() as usize;
             let moves = BLOCKED_BISHOP[idx]
                 [pext(self.all_pieces, remove_border(EMPTY_PSEUDO_BISHOP[idx])) as usize]
                 | BLOCKED_ROOK[idx]
@@ -280,7 +388,7 @@ impl State {
                         & !board)
                         | (BLOCKED_ROOK[pos_idx as usize][pext(
                             all,
-                            remove_border(EMPTY_PSEUDO_ROOK[pos_idx as usize]),
+                            remove_border_rook(EMPTY_PSEUDO_ROOK[pos_idx as usize], pos_idx as u8),
                         ) as usize]
                             & !board)
                 }
@@ -350,9 +458,14 @@ impl State {
         let mut all_b_attacks: u64 = 0;
         let pins = self.get_pins(self.white_to_move);
 
-        for piece in &self.pieces_list {
-            let (board, attacks) =
-                self.get_legal_move_board(piece.position_idx, piece._type, piece.white);
+        for (idx, piece) in self.pieces_list.iter().enumerate() {
+            let piece = if let Some(p) = piece {
+                p
+            } else {
+                continue;
+            };
+
+            let (board, attacks) = self.get_legal_move_board(idx as u64, piece._type, piece.white);
 
             if piece.white {
                 all_w_attacks |= attacks;
@@ -366,16 +479,12 @@ impl State {
                 }
             }
 
-            if pins.contains(&(piece.position_idx as usize)) {
+            if pins.contains(&idx) {
                 continue;
             }
 
-            let _move = get_moves_from_move_board(
-                board,
-                piece.position_idx,
-                piece._type,
-                self.white_to_move,
-            );
+            let _move =
+                get_moves_from_move_board(board, idx as u64, piece._type, self.white_to_move);
 
             moves.extend(_move);
         }

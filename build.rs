@@ -96,7 +96,7 @@ pub const fn remove_border_rook(board: u64, idx: u8) -> u64 {
             6 => h | c1,
             7 => a | c1 | c8,
             8 => a | c8,
-            11 => a | c8,
+            11 => a | c1,
             _ => a | h | c1 | c8,
         }
 }
@@ -365,7 +365,7 @@ pub const fn generate_blocked_rook(sq: u64, blockers: u64) -> u64 {
         i -= 1;
         let bit = 1 << (r * 8 + i);
         attacks |= bit;
-        if (blockers & bit) != 0 {
+        if (blockers & bit) == bit {
             break;
         }
     }

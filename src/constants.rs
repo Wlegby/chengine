@@ -6,9 +6,9 @@ pub const EMPTY_PSEUDO_KNIGHT: [u64; 64] = generate_pseudo_knight();
 pub const EMPTY_PSEUDO_KING: [u64; 64] = generate_pseudo_king();
 
 pub const WHITE_KING_CASTLE: u16 = 0b110_000100;
-pub const WHITE_QUEEN_CASTLE: u16 = 0b1_000100;
-pub const BLACK_KING_CASTLE: u16 = 0b111001_111100;
-pub const BLACK_QUEEN_CASTLE: u16 = 0b111110_111100;
+pub const WHITE_QUEEN_CASTLE: u16 = 0b10_000100;
+pub const BLACK_KING_CASTLE: u16 = 0b111110_111100;
+pub const BLACK_QUEEN_CASTLE: u16 = 0b111010_111100;
 
 pub const PROMOTION_QUEEN: u16 = 0b1 << 12;
 pub const PROMOTION_ROOK: u16 = 0b10 << 12;

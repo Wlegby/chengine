@@ -23,14 +23,21 @@ use vampirc_uci::{parse_one, UciMessage};
 include!(concat!(env!("OUT_DIR"), "/tables.rs"));
 
 fn main() {
+    let mut state = State::from_fen("3qkbnr/2pBpppp/2n5/p7/1r2P3/8/PPPP1PPP/RNBQK1NR b KQk - 0 5");
+
     // let mut state = State::default();
-    // state.white_to_move = false;
-    //
-    // let moves = state.get_moves();
-    // for m in moves {
-    //     println!("{}", move_to_uci(m));
-    // }
-    start_uci();
+    state.white_to_move = false;
+
+    let moves = state.get_moves();
+
+    display_bit_board(state.white.all);
+    display_bit_board(state.white.attacks);
+
+    for m in moves {
+        println!("{}", move_to_uci(m));
+    }
+
+    // start_uci();
 }
 
 fn start_uci() {
@@ -38,7 +45,6 @@ fn start_uci() {
     let stdin = io::stdin();
 
     let mut state = State::default();
-    state.white_to_move = false;
 
     for line in stdin.lock().lines() {
         let line = line.unwrap();
@@ -56,7 +62,6 @@ fn start_uci() {
             UciMessage::UciNewGame => {
                 // Reset the board to the standard starting position
                 state = State::default();
-                state.white_to_move = false;
             }
             UciMessage::Position {
                 startpos,
@@ -67,14 +72,13 @@ fn start_uci() {
                 // If the GUI sends a custom FEN, load it. Otherwise, load startpos.
                 if let Some(custom_fen) = fen {
                     state = State::from_fen(&custom_fen.to_string());
-                    state.white_to_move = false;
                 } else if startpos {
                     state = State::default();
-                    state.white_to_move = false;
                 }
 
                 for m in uci_moves {
                     let _move = uci_to_move(&m.to_string());
+                    state.make_move(_move);
                 }
             }
             UciMessage::Go { .. } => {
