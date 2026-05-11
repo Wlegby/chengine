@@ -15,6 +15,64 @@ pub const PROMOTION_ROOK: u16 = 0b10 << 12;
 pub const PROMOTION_BISHOP: u16 = 0b11 << 12;
 pub const PROMOTION_KNIGHT: u16 = 0b100 << 12;
 
+pub const RAY_BETWEEN: [[u64; 64]; 64] = init_ray_between();
+
+const fn init_ray_between() -> [[u64; 64]; 64] {
+    let mut table = [[0; 64]; 64];
+    let mut sq1 = 0;
+
+    while sq1 < 64 {
+        let mut sq2 = 0;
+        while sq2 < 64 {
+            let r1 = (sq1 / 8) as i8;
+            let f1 = (sq1 % 8) as i8;
+            let r2 = (sq2 / 8) as i8;
+            let f2 = (sq2 % 8) as i8;
+
+            let dr = r2 - r1;
+            let df = f2 - f1;
+
+            let abs_dr = if dr < 0 { -dr } else { dr };
+            let abs_df = if df < 0 { -df } else { df };
+
+            // Check if the squares share a rank, file, or diagonal
+            if dr == 0 || df == 0 || abs_dr == abs_df {
+                let step_r = if dr > 0 {
+                    1
+                } else if dr < 0 {
+                    -1
+                } else {
+                    0
+                };
+                let step_f = if df > 0 {
+                    1
+                } else if df < 0 {
+                    -1
+                } else {
+                    0
+                };
+
+                let mut r = r1 + step_r;
+                let mut f = f1 + step_f;
+                let mut mask = 0u64;
+
+                // Step from sq1 towards sq2, flipping the bits in between,
+                // stopping strictly before we reach sq2.
+                while r != r2 || f != f2 {
+                    mask |= 1 << (r * 8 + f);
+                    r += step_r;
+                    f += step_f;
+                }
+                table[sq1][sq2] = mask;
+            }
+            sq2 += 1;
+        }
+        sq1 += 1;
+    }
+
+    table
+}
+
 const fn generate_pseudo_king() -> [u64; 64] {
     let mut attacks: [u64; 64] = [0; 64];
 

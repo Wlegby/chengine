@@ -58,7 +58,7 @@ pub fn uci_to_move(uci: &str) -> Move {
             'q' => PROMOTION_QUEEN,
             'r' => PROMOTION_ROOK,
             'b' => PROMOTION_BISHOP,
-            'k' => PROMOTION_KNIGHT,
+            'n' => PROMOTION_KNIGHT,
             _ => panic!("Expected valid uci"),
         }
     } else {
@@ -100,7 +100,7 @@ pub fn move_to_uci(_move: Move) -> String {
     let promotion = match prom {
         PROMOTION_QUEEN => "q",
         PROMOTION_BISHOP => "b",
-        PROMOTION_KNIGHT => "k",
+        PROMOTION_KNIGHT => "n",
         PROMOTION_ROOK => "r",
         _ => "",
     };

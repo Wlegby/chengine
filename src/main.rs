@@ -23,21 +23,21 @@ use vampirc_uci::{parse_one, UciMessage};
 include!(concat!(env!("OUT_DIR"), "/tables.rs"));
 
 fn main() {
-    // let mut state = State::from_fen("3qkbnr/2pBpppp/2n5/p7/1r2P3/8/PPPP1PPP/RNBQK1NR b KQk - 0 5");
-    //
-    // // let mut state = State::default();
-    // state.white_to_move = false;
-    //
-    // let moves = state.get_moves();
-    //
-    // display_bit_board(state.white.all);
-    // display_bit_board(state.white.attacks);
-    //
-    // for m in moves {
-    //     println!("{}", move_to_uci(m));
-    // }
-
     start_uci();
+    // debug();
+}
+
+fn debug() {
+    let mut state = State::from_fen("8/3r4/r6P/8/2K5/8/k6R/8 b - - 27 141");
+
+    // let mut state = State::default();
+    state.white_to_move = false;
+
+    let moves = state.get_moves();
+
+    for m in moves {
+        println!("{}", move_to_uci(m));
+    }
 }
 
 fn start_uci() {
@@ -87,7 +87,7 @@ fn start_uci() {
 
                 println!("bestmove {}", move_to_uci(*moves.choose(&mut rng).unwrap()));
             }
-            UciMessage::Quit => break,
+            UciMessage::Quit => return,
             _ => {}
         }
     }
