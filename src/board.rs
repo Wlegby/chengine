@@ -445,12 +445,10 @@ impl State {
 
     pub fn get_legal_move_board(&self, pos_idx: u64, piece: PType, white: bool) -> (u64, u64) {
         let (board, king) = if white {
-            (self.white.all, self.white.king)
+            (self.white.all, self.black.king)
         } else {
-            (self.black.all, self.black.king)
+            (self.black.all, self.white.king)
         };
-
-        let kings = self.white.king | self.black.king;
 
         fn move_board(
             state: &State,
@@ -495,8 +493,8 @@ impl State {
             move_board(self, self.all_pieces, board, pos_idx, piece, white, false),
             move_board(
                 self,
-                self.all_pieces & !kings,
-                board & !king,
+                self.all_pieces & !king,
+                board,
                 pos_idx,
                 piece,
                 white,

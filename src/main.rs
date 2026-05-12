@@ -84,6 +84,7 @@ fn start_uci() {
             UciMessage::Go { .. } => {
                 // 2. Generate moves for the current position
                 let moves = state.get_moves();
+                display_bit_board(state.white.attacks);
 
                 println!("bestmove {}", move_to_uci(*moves.choose(&mut rng).unwrap()));
             }
