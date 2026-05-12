@@ -290,11 +290,19 @@ impl State {
                     color_board.king = 1 << to as u64;
                     color_board.rook &= !(0b10000000 << shift);
                     color_board.rook |= 0b100000 << shift;
+
+                    let rook = self.pieces_list[7 + shift];
+                    self.pieces_list[5 + shift] = rook;
+                    self.pieces_list[7 + shift] = None;
                 } else {
                     // queen-side
                     color_board.king = 1 << to as u64;
                     color_board.rook &= !(0b1 << shift);
                     color_board.rook |= 0b1000 << shift;
+
+                    let rook = self.pieces_list[shift];
+                    self.pieces_list[3 + shift] = rook;
+                    self.pieces_list[shift] = None;
                 }
             } else {
                 color_board.king = 1 << to as u64;
@@ -615,6 +623,9 @@ impl State {
 
             moves.extend(_move);
         }
+
+        all_w_attacks |= EMPTY_PSEUDO_KING[self.white.king.trailing_zeros() as usize];
+        all_b_attacks |= EMPTY_PSEUDO_KING[self.black.king.trailing_zeros() as usize];
 
         self.white.attacks = all_w_attacks;
         self.black.attacks = all_b_attacks;
