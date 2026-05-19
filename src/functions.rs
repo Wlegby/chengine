@@ -1,14 +1,91 @@
+use rand::seq::IteratorRandom;
+
 use crate::board::ColorBoards;
 use crate::board::Move;
 use crate::board::PType;
 use crate::board::Piece;
+use crate::board::State;
 use crate::constants::PROMOTION_BISHOP;
 use crate::constants::PROMOTION_KNIGHT;
 use crate::constants::PROMOTION_QUEEN;
 use crate::constants::PROMOTION_ROOK;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
+
+pub fn search(mut state: State, depth: u32, stop_flag: &AtomicBool) -> (Option<Move>, i32) {
+    // 1. Check if we have been ordered to stop
+    if stop_flag.load(Ordering::Relaxed) {
+        return (None, 0);
+    }
+
+    if depth == 0 {
+        return (None, state.evaluate());
+    }
+
+    if state.half_move_clock == 99 {
+        return (None, 0);
+    }
+
+    let moves = state.get_moves();
+
+    if moves.is_empty() {
+        let (board, other) = if state.white_to_move {
+            (state.white, state.black)
+        } else {
+            (state.black, state.white)
+        };
+
+        let score = if board.king & other.attacks != 0 {
+            -i32::MAX
+        } else {
+            0
+        };
+        return (None, score);
+    }
+
+    let mut best_move = None;
+    let mut max_eval = -i32::MAX;
+    let mut tie_count = 0;
+
+    let mut rng = rand::rng();
+
+    for m in moves {
+        // 2. We can also check the flag inside the move loop to abort even faster
+        if stop_flag.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let mut new_state = state.clone();
+        new_state.make_move(m);
+
+        // Pass the stop flag down the recursive calls
+        let (_, opponent_eval) = search(new_state, depth - 1, stop_flag);
+
+        // Skip updating the best move if we aborted the lower tree
+        if stop_flag.load(Ordering::Relaxed) {
+            break;
+        }
+
+        let our_eval = -opponent_eval;
+
+        if our_eval > max_eval {
+            max_eval = our_eval;
+            best_move = Some(m);
+            tie_count = 1;
+        } else if our_eval == max_eval {
+            tie_count += 1;
+
+            if (0..tie_count).choose(&mut rng).unwrap() == 0 {
+                best_move = Some(m);
+            }
+        }
+    }
+
+    (best_move, max_eval)
+}
 
 pub fn uci_to_move(uci: &str) -> Move {
     let col_from = match uci.chars().nth(0).expect("Expected valid uci") {

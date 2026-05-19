@@ -17,6 +17,70 @@ pub const PROMOTION_KNIGHT: u16 = 0b100 << 12;
 
 pub const RAY_BETWEEN: [[u64; 64]; 64] = init_ray_between();
 
+pub const ZOBRIST: ZobristKeys = generate_zobrist();
+
+pub struct ZobristKeys {
+    pub pieces: [[[u64; 64]; 6]; 2], // [color][piece][square]
+    pub side_to_move: u64,
+    pub castling: [u64; 16],
+    pub en_passant: [u64; 8],
+}
+
+const fn generate_zobrist() -> ZobristKeys {
+    // A simple Xorshift PRNG to generate random numbers at compile time
+    let mut seed: u64 = 0x98f1071585ceeb0a;
+
+    let mut pieces = [[[0; 64]; 6]; 2];
+    let mut c = 0;
+    while c < 2 {
+        let mut p = 0;
+        while p < 6 {
+            let mut sq = 0;
+            while sq < 64 {
+                seed ^= seed << 13;
+                seed ^= seed >> 7;
+                seed ^= seed << 17;
+                pieces[c][p][sq] = seed;
+                sq += 1;
+            }
+            p += 1;
+        }
+        c += 1;
+    }
+
+    seed ^= seed << 13;
+    seed ^= seed >> 7;
+    seed ^= seed << 17;
+    let side_to_move = seed;
+
+    let mut castling = [0; 16];
+    let mut i = 0;
+    while i < 16 {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        castling[i] = seed;
+        i += 1;
+    }
+
+    let mut en_passant = [0; 8];
+    let mut i = 0;
+    while i < 8 {
+        seed ^= seed << 13;
+        seed ^= seed >> 7;
+        seed ^= seed << 17;
+        en_passant[i] = seed;
+        i += 1;
+    }
+
+    ZobristKeys {
+        pieces,
+        side_to_move,
+        castling,
+        en_passant,
+    }
+}
+
 const fn init_ray_between() -> [[u64; 64]; 64] {
     let mut table = [[0; 64]; 64];
     let mut sq1 = 0;

@@ -6,7 +6,7 @@ pub struct Piece {
     pub _type: PType,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct State {
     pub white: ColorBoards,
     pub black: ColorBoards,
@@ -16,6 +16,9 @@ pub struct State {
     pub half_move_clock: usize,
     pub full_move_clock: usize,
     pub pieces_list: [Option<Piece>; 64],
+    pub pos_history: [u64; 100],
+    pub history_idx: usize,
+    pub hash: u64,
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -100,6 +103,17 @@ impl PType {
             _ => false,
         }
     }
+
+    pub fn to_index(&self) -> usize {
+        match self {
+            Self::Pawn => 0,
+            Self::Knight => 1,
+            Self::Bishop => 2,
+            Self::Rook => 3,
+            Self::Queen => 4,
+            Self::King => 5,
+        }
+    }
 }
 
 impl ColorBoards {
@@ -115,6 +129,109 @@ impl Default for State {
 }
 
 impl State {
+    pub fn is_threefold_repetition(&self) -> bool {
+        // if less than 4 moves it's impossible
+        if self.half_move_clock < 4 {
+            return false;
+        }
+
+        let mut repetitions = 1; // It appears once on the current board
+
+        // We only need to check the history up to the current half_move_clock
+        for i in 0..self.half_move_clock {
+            if self.pos_history[i] == self.hash {
+                repetitions += 1;
+                if repetitions >= 3 {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    pub fn calculate_initial_hash(&self) -> u64 {
+        let mut hash = 0;
+
+        // 1. Pieces
+        for sq in 0..64 {
+            if let Some(piece) = self.pieces_list[sq] {
+                let color_idx = if piece.white { 0 } else { 1 };
+                let piece_idx = piece._type.to_index();
+                hash ^= ZOBRIST.pieces[color_idx][piece_idx][sq];
+            }
+        }
+
+        // 2. Side to move
+        if !self.white_to_move {
+            hash ^= ZOBRIST.side_to_move;
+        }
+
+        // 3. Castling
+        let mut castling_idx = 0;
+        if self.white.castle_k {
+            castling_idx |= 1;
+        }
+        if self.white.castle_q {
+            castling_idx |= 2;
+        }
+        if self.black.castle_k {
+            castling_idx |= 4;
+        }
+        if self.black.castle_q {
+            castling_idx |= 8;
+        }
+        hash ^= ZOBRIST.castling[castling_idx];
+
+        // 4. En Passant
+        if self.en_passant != 0 {
+            let ep_sq = self.en_passant.trailing_zeros() as usize;
+            let file = ep_sq % 8; // We only need the file (A-H) for Zobrist
+            hash ^= ZOBRIST.en_passant[file];
+        }
+
+        hash
+    }
+    pub fn evaluate(&self) -> i32 {
+        if self.is_threefold_repetition() {
+            // 0 for a draw
+            return 0;
+        }
+
+        let mut white_count = 0;
+        let mut black_count = 0;
+
+        fn get_score(p: Piece) -> i32 {
+            match p._type {
+                PType::Pawn => 1,
+                PType::Rook => 5,
+                PType::Knight => 3,
+                PType::Bishop => 3,
+                PType::Queen => 9,
+                _ => panic!("Not supposed to be here"),
+            }
+        }
+
+        for p in self.pieces_list {
+            if let Some(p) = p {
+                let count = if p.white {
+                    &mut white_count
+                } else {
+                    &mut black_count
+                };
+                *count += get_score(p) as i32;
+            }
+        }
+
+        let (own, other) = if self.white_to_move {
+            (white_count, black_count)
+        } else {
+            (black_count, white_count)
+        };
+
+        own - other
+    }
+
     pub fn update_all(&mut self) {
         self.white.update_all();
         self.black.update_all();
@@ -191,6 +308,22 @@ impl State {
             _ => {}
         }
 
+        let mut castling_idx = 0;
+        if self.white.castle_k {
+            castling_idx |= 1;
+        }
+        if self.white.castle_q {
+            castling_idx |= 2;
+        }
+        if self.black.castle_k {
+            castling_idx |= 4;
+        }
+        if self.black.castle_q {
+            castling_idx |= 8;
+        }
+
+        self.hash ^= ZOBRIST.castling[castling_idx];
+
         let p = self.pieces_list[from];
 
         let (color_board, other_color) = if self.white_to_move {
@@ -205,7 +338,12 @@ impl State {
 
         if let Some(mut piece) = p {
             // not king moves
+
+            // xor the from piece
+            self.hash ^= ZOBRIST.pieces[self.white_to_move as usize][piece._type.to_index()][from];
+
             if to == old_en_passant.trailing_zeros() as usize && piece._type == PType::Pawn {
+                // remove the old en passant pawn
                 fn shift(white: bool, x: usize) -> usize {
                     if white {
                         x - 8
@@ -215,6 +353,10 @@ impl State {
                 }
 
                 self.pieces_list[shift(self.white_to_move, to)] = None;
+
+                // xor the old pawn
+                self.hash ^= ZOBRIST.pieces[!self.white_to_move as usize][PType::Pawn.to_index()]
+                    [shift(self.white_to_move, to)];
             }
 
             if piece._type == PType::Pawn {
@@ -229,20 +371,13 @@ impl State {
                 }
             }
 
-            self.pieces_list[to] = Some(piece);
-            self.pieces_list[from] = None;
+            // remove the take piece
+            if let Some(p) = self.pieces_list[to] {
+                self.hash ^= ZOBRIST.pieces[!self.white_to_move as usize][p._type.to_index()][to];
 
-            if (other_color.pawn
-                | other_color.rook
-                | other_color.knight
-                | other_color.bishop
-                | other_color.queen)
-                & 1 << to
-                != 0
-            {
                 reset_clock = true;
                 // capture happened
-                // remove the taken piece
+                // remove the taken piece (not checking which one it was)
                 other_color.pawn &= !(1 << to);
                 other_color.rook &= !(1 << to);
                 other_color.knight &= !(1 << to);
@@ -250,7 +385,11 @@ impl State {
                 other_color.queen &= !(1 << to);
             }
 
-            // if there was a promotion, remove the old pawn
+            self.pieces_list[to] = Some(piece);
+            self.pieces_list[from] = None;
+
+            // if there was a promotion, remove the old pawn (because the piece type is now not a
+            // pawn anymore)
             if prom.is_some() {
                 color_board.pawn &= !(1 << from as u64);
             }
@@ -280,8 +419,14 @@ impl State {
                 }
                 PType::King => panic!("Kings are not supposed to exist here"),
             }
+
+            // add the to piece
+            self.hash ^= ZOBRIST.pieces[self.white_to_move as usize][piece._type.to_index()][to];
         } else {
             // king moves
+            //remove the king
+            self.hash ^= ZOBRIST.pieces[self.white_to_move as usize][PType::King.to_index()][from];
+
             if from.abs_diff(to) == 2 {
                 // if caslte
                 let shift = if self.white_to_move { 0 } else { 56 };
@@ -294,6 +439,13 @@ impl State {
                     let rook = self.pieces_list[7 + shift];
                     self.pieces_list[5 + shift] = rook;
                     self.pieces_list[7 + shift] = None;
+
+                    // remove the rook
+                    self.hash ^= ZOBRIST.pieces[self.white_to_move as usize]
+                        [PType::Rook.to_index()][shift + 7];
+                    //add the rook
+                    self.hash ^= ZOBRIST.pieces[self.white_to_move as usize]
+                        [PType::Rook.to_index()][shift + 5];
                 } else {
                     // queen-side
                     color_board.king = 1 << to as u64;
@@ -303,40 +455,52 @@ impl State {
                     let rook = self.pieces_list[shift];
                     self.pieces_list[3 + shift] = rook;
                     self.pieces_list[shift] = None;
+
+                    // remove the rook
+                    self.hash ^=
+                        ZOBRIST.pieces[self.white_to_move as usize][PType::Rook.to_index()][shift];
+                    //add the rook
+                    self.hash ^= ZOBRIST.pieces[self.white_to_move as usize]
+                        [PType::Rook.to_index()][shift + 3];
                 }
             } else {
                 color_board.king = 1 << to as u64;
-                self.pieces_list[to] = None;
-                if (other_color.pawn
-                    | other_color.rook
-                    | other_color.knight
-                    | other_color.bishop
-                    | other_color.queen)
-                    & 1 << to
-                    != 0
-                {
+
+                // remove the take piece
+                if let Some(p) = self.pieces_list[to] {
+                    self.hash ^=
+                        ZOBRIST.pieces[!self.white_to_move as usize][p._type.to_index()][to];
+
                     reset_clock = true;
                     // capture happened
-                    // remove the taken piece
+                    // remove the taken piece (not checking which one it was)
                     other_color.pawn &= !(1 << to);
                     other_color.rook &= !(1 << to);
                     other_color.knight &= !(1 << to);
                     other_color.bishop &= !(1 << to);
                     other_color.queen &= !(1 << to);
                 }
+
+                self.pieces_list[to] = None;
             }
         }
 
-        if reset_clock {
-            self.half_move_clock = 0
-        } else {
-            self.half_move_clock += 1;
-        }
         if !self.white_to_move {
             self.full_move_clock += 1;
         }
         self.update_all();
         self.white_to_move = !self.white_to_move;
+
+        if reset_clock {
+            self.pos_history = [0; 100];
+            self.history_idx = 0;
+            self.pos_history[self.history_idx] = self.hash;
+            self.half_move_clock = 0
+        } else {
+            self.half_move_clock += 1;
+            self.history_idx += 1;
+            self.pos_history[self.history_idx] = self.hash;
+        }
     }
 
     pub fn from_fen(fen: &str) -> Self {
@@ -373,6 +537,9 @@ impl State {
             half_move_clock,
             full_move_clock,
             pieces_list: pieces,
+            pos_history: [0; 100],
+            history_idx: 0,
+            hash: 0,
         }
     }
 
