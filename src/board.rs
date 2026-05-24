@@ -804,10 +804,6 @@ impl State {
             if pins.contains(&idx) {
                 board &= RAY_BETWEEN.1[idx][c_board.king.trailing_zeros() as usize];
             }
-            if piece._type == PType::Pawn {
-                println!("hello");
-                display_bit_board(RAY_BETWEEN.1[idx][c_board.king.trailing_zeros() as usize]);
-            }
 
             let mut m =
                 get_moves_from_move_board(board, idx as u64, piece._type, self.white_to_move);
