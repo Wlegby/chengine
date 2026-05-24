@@ -32,14 +32,12 @@ fn main() {
 }
 
 fn debug() {
-    let mut state = State::from_fen("8/8/1Rr3k1/8/8/8/8/1K6 b - - 0 1");
+    let mut state = State::from_fen("4k3/5p2/6Q1/8/8/8/8/K7 b - - 0 1");
 
     // let mut state = State::default();
     state.white_to_move = false;
 
     let moves = state.get_moves();
-
-    display_bit_board(RAY_BETWEEN.1[42][46]);
 
     for m in moves {
         display_move(m);

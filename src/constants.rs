@@ -89,75 +89,71 @@ const fn init_ray_between() -> ([[u64; 64]; 64], [[u64; 64]; 64]) {
     while sq1 < 64 {
         let mut sq2 = 0;
         while sq2 < 64 {
-            let r1 = (sq1 / 8) as i8;
-            let f1 = (sq1 % 8) as i8;
-            let r2 = (sq2 / 8) as i8;
-            let f2 = (sq2 % 8) as i8;
+            // Skip if squares are the same to avoid 0-step infinite loops
+            if sq1 != sq2 {
+                let r1 = (sq1 / 8) as i8;
+                let f1 = (sq1 % 8) as i8;
+                let r2 = (sq2 / 8) as i8;
+                let f2 = (sq2 % 8) as i8;
 
-            let dr = r2 - r1;
-            let df = f2 - f1;
+                let dr = r2 - r1;
+                let df = f2 - f1;
 
-            let abs_dr = if dr < 0 { -dr } else { dr };
-            let abs_df = if df < 0 { -df } else { df };
+                let abs_dr = if dr < 0 { -dr } else { dr };
+                let abs_df = if df < 0 { -df } else { df };
 
-            // Check if the squares share a rank, file, or diagonal
-            if dr == 0 || df == 0 || abs_dr == abs_df {
-                let step_r = if dr > 0 {
-                    1
-                } else if dr < 0 {
-                    -1
-                } else {
-                    0
-                };
-                let step_f = if df > 0 {
-                    1
-                } else if df < 0 {
-                    -1
-                } else {
-                    0
-                };
+                // Check if the squares share a rank, file, or diagonal
+                if dr == 0 || df == 0 || abs_dr == abs_df {
+                    let step_r = if dr > 0 {
+                        1
+                    } else if dr < 0 {
+                        -1
+                    } else {
+                        0
+                    };
+                    let step_f = if df > 0 {
+                        1
+                    } else if df < 0 {
+                        -1
+                    } else {
+                        0
+                    };
 
-                let f_step_r = dr != 0;
-                let f_step_f = df != 0;
+                    let mut mask = 0u64;
+                    let mut full_mask = 0u64;
 
-                let mut r = r1 + step_r;
-                let mut f = f1 + step_f;
+                    // 1. Calculate strictly between mask (table)
+                    let mut r = r1 + step_r;
+                    let mut f = f1 + step_f;
 
-                let mut f_r = if !f_step_r {
-                    r1
-                } else if !f_step_f {
-                    0
-                } else {
-                    r1 - (if r1 > f1 { f1 } else { r1 })
-                };
+                    while r != r2 || f != f2 {
+                        mask |= 1 << (r * 8 + f);
+                        r += step_r;
+                        f += step_f;
+                    }
 
-                let mut f_f = if !f_step_f {
-                    r1
-                } else if !f_step_r {
-                    0
-                } else {
-                    f1 - (if f1 > r1 { r1 } else { f1 })
-                };
+                    // 2. Calculate the full ray mask extending to both board edges
+                    // Walk forward from sq1
+                    let mut curr_r = r1;
+                    let mut curr_f = f1;
+                    while curr_r >= 0 && curr_r < 8 && curr_f >= 0 && curr_f < 8 {
+                        full_mask |= 1 << (curr_r * 8 + curr_f);
+                        curr_r += step_r;
+                        curr_f += step_f;
+                    }
 
-                let mut mask = 0u64;
-                let mut full_mask = 0u64;
+                    // Walk backward from sq1
+                    let mut curr_r = r1 - step_r;
+                    let mut curr_f = f1 - step_f;
+                    while curr_r >= 0 && curr_r < 8 && curr_f >= 0 && curr_f < 8 {
+                        full_mask |= 1 << (curr_r * 8 + curr_f);
+                        curr_r -= step_r;
+                        curr_f -= step_f;
+                    }
 
-                // Step from sq1 towards sq2, flipping the bits in between,
-                // stopping strictly before we reach sq2.
-                while r != r2 || f != f2 {
-                    mask |= 1 << (r * 8 + f);
-                    r += step_r;
-                    f += step_f;
+                    full_ray_table[sq1][sq2] = full_mask;
+                    table[sq1][sq2] = mask;
                 }
-
-                while f_r < 8 && f_f < 8 && (f_step_r || f_step_f) {
-                    full_mask |= 1 << (f_r * 8 + f_f);
-                    f_r += (f_step_r as i8);
-                    f_f += (f_step_f as i8);
-                }
-
-                full_ray_table[sq1][sq2] = full_mask;
-                table[sq1][sq2] = mask;
             }
             sq2 += 1;
         }
