@@ -53,10 +53,7 @@ pub fn search(
     }
 
     let mut best_move = None;
-    let mut max_eval = -i32::MAX;
-    let mut tie_count = 0;
-
-    let mut rng = rand::rng();
+    let mut max_eval = -1_000_000;
 
     for m in moves {
         if stop_flag.load(Ordering::Relaxed) {
@@ -66,8 +63,8 @@ pub fn search(
         let mut new_state = state.clone();
         new_state.make_move(m);
 
-        // Pass the stop flag down the recursive calls
-        let (_, opponent_eval) = search(new_state, depth - 1, -alpha, -beta, stop_flag);
+        // FIX 1: -beta, -alpha
+        let (_, opponent_eval) = search(new_state, depth - 1, -beta, -alpha, stop_flag);
 
         if stop_flag.load(Ordering::Relaxed) {
             break;
@@ -75,21 +72,15 @@ pub fn search(
 
         let our_eval = -opponent_eval;
 
+        // FIX 2: No more random tie_count
         if our_eval > max_eval {
             max_eval = our_eval;
             best_move = Some(m);
-            tie_count = 1;
-        } else if our_eval == max_eval {
-            tie_count += 1;
-
-            if (0..tie_count).choose(&mut rng).unwrap() == 0 {
-                best_move = Some(m);
-            }
         }
 
         alpha = alpha.max(our_eval);
         if alpha >= beta {
-            break;
+            break; // Standard pruning
         }
     }
 

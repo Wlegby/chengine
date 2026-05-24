@@ -106,7 +106,7 @@ fn start_uci() {
                     let mut final_eval = 0;
 
                     // Iterative Deepening: Search from depth 1 to 5
-                    for depth in 1..=10 {
+                    for depth in 1..=7 {
                         let (m, eval) = search(
                             state_clone.clone(),
                             depth,
