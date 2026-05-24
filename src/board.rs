@@ -353,6 +353,7 @@ impl State {
                 }
 
                 self.pieces_list[shift(self.white_to_move, to)] = None;
+                other_color.pawn &= !(1 << shift(self.white_to_move, to));
 
                 // xor the old pawn
                 self.hash ^= ZOBRIST.pieces[!self.white_to_move as usize][PType::Pawn.to_index()]

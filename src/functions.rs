@@ -15,7 +15,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
 
-pub fn search(mut state: State, depth: u32, stop_flag: &AtomicBool) -> (Option<Move>, i32) {
+pub fn search(
+    mut state: State,
+    depth: u32,
+    mut alpha: i32,
+    beta: i32,
+    stop_flag: &AtomicBool,
+) -> (Option<Move>, i32) {
     // 1. Check if we have been ordered to stop
     if stop_flag.load(Ordering::Relaxed) {
         return (None, 0);
@@ -53,7 +59,6 @@ pub fn search(mut state: State, depth: u32, stop_flag: &AtomicBool) -> (Option<M
     let mut rng = rand::rng();
 
     for m in moves {
-        // 2. We can also check the flag inside the move loop to abort even faster
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
@@ -62,9 +67,8 @@ pub fn search(mut state: State, depth: u32, stop_flag: &AtomicBool) -> (Option<M
         new_state.make_move(m);
 
         // Pass the stop flag down the recursive calls
-        let (_, opponent_eval) = search(new_state, depth - 1, stop_flag);
+        let (_, opponent_eval) = search(new_state, depth - 1, -alpha, -beta, stop_flag);
 
-        // Skip updating the best move if we aborted the lower tree
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
@@ -81,6 +85,11 @@ pub fn search(mut state: State, depth: u32, stop_flag: &AtomicBool) -> (Option<M
             if (0..tie_count).choose(&mut rng).unwrap() == 0 {
                 best_move = Some(m);
             }
+        }
+
+        alpha = alpha.max(our_eval);
+        if alpha >= beta {
+            break;
         }
     }
 
