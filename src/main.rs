@@ -12,6 +12,7 @@ use functions::*;
 use qol::*;
 
 use rand::prelude::*;
+use rayon::prelude::*;
 use std::env;
 use std::fs;
 use std::io::{self, BufRead};
@@ -107,15 +108,36 @@ fn start_uci() {
                     let mut best_move = None;
                     let mut final_eval = 0;
 
-                    // Iterative Deepening: Search from depth 1 to 5
+                    // Iterative Deepening: Search from depth 1 to 7
                     for depth in 1..=7 {
-                        let (m, eval) = search(
-                            state_clone.clone(),
-                            depth,
-                            -i32::MAX,
-                            i32::MAX,
-                            &stop_search_clone,
-                        );
+                        // Split the first layer of moves across different cores
+                        let best_root_result = moves
+                            .par_iter()
+                            .filter_map(|&m| {
+                                // If we've been asked to stop, exit this branch early
+                                if stop_search_clone.load(Ordering::Relaxed) {
+                                    return None;
+                                }
+
+                                // Clone the state and make the root move
+                                let mut new_state = state_clone.clone();
+                                new_state.make_move(m);
+
+                                // Search the rest of the tree single-threaded from here
+                                let (_, opponent_eval) = search(
+                                    new_state,
+                                    depth - 1,
+                                    -i32::MAX, // Starting with open alpha/beta windows
+                                    i32::MAX,
+                                    &stop_search_clone,
+                                );
+
+                                let our_eval = -opponent_eval;
+
+                                // Return the move and its evaluated score
+                                Some((m, our_eval))
+                            })
+                            .max_by_key(|&(_, eval)| eval); // <-- Put them back together to return the best
 
                         // If we were interrupted by a `stop` command, discard the
                         // incomplete results of this depth and break out.
@@ -124,21 +146,18 @@ fn start_uci() {
                         }
 
                         // Otherwise, record the completed depth's best move
-                        if m.is_some() {
-                            best_move = m;
+                        if let Some((m, eval)) = best_root_result {
+                            best_move = Some(m);
                             final_eval = eval;
 
                             // print the info
-                            if let Some(m) = best_move {
-                                let score_string = format_uci_score(final_eval * 100);
+                            let score_string = format_uci_score(final_eval * 100);
+                            let move_str = move_to_uci(m);
 
-                                let move_str = move_to_uci(m);
-
-                                println!(
-                                    "info depth {} score {} pv {}",
-                                    depth, score_string, move_str
-                                );
-                            }
+                            println!(
+                                "info depth {} score {} pv {}",
+                                depth, score_string, move_str
+                            );
                         }
                     }
 
