@@ -31,15 +31,17 @@ fn main() {
 }
 
 fn debug() {
-    let mut state = State::from_fen("8/3r4/r6P/8/2K5/8/k6R/8 b - - 27 141");
+    let mut state = State::from_fen("8/8/1Rr3k1/8/8/8/8/1K6 b - - 0 1");
 
     // let mut state = State::default();
     state.white_to_move = false;
 
     let moves = state.get_moves();
 
+    display_bit_board(RAY_BETWEEN.1[42][46]);
+
     for m in moves {
-        println!("{}", move_to_uci(m));
+        display_move(m);
     }
 }
 
@@ -89,6 +91,8 @@ fn start_uci() {
                 }
 
                 is_self_white = state.white_to_move;
+
+                display_bit_board(state.all_pieces);
             }
             UciMessage::Go { .. } => {
                 let mut state_clone = state.clone();
@@ -125,6 +129,18 @@ fn start_uci() {
                         if m.is_some() {
                             best_move = m;
                             final_eval = eval;
+
+                            // print the info
+                            if let Some(m) = best_move {
+                                let score_string = format_uci_score(final_eval * 100);
+
+                                let move_str = move_to_uci(m);
+
+                                println!(
+                                    "info depth {} score {} pv {}",
+                                    depth, score_string, move_str
+                                );
+                            }
                         }
                     }
 

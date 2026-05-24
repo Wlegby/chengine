@@ -369,3 +369,22 @@ pub fn fen_positions_to_bitboards(
 
     (white, black)
 }
+
+pub fn format_uci_score(score: i32) -> String {
+    let mate_threshold = 900_000; // Example threshold
+
+    if score > mate_threshold {
+        // Engine is delivering mate.
+        // Note: To get the exact moves until mate, you need to track
+        // distance-from-root (ply) in your search function.
+        let moves_to_mate = (1_000_000 - score + 1) / 2;
+        format!("mate {}", moves_to_mate)
+    } else if score < -mate_threshold {
+        // Engine is getting mated.
+        let moves_to_mate = (-1_000_000 - score - 1) / 2;
+        format!("mate {}", moves_to_mate)
+    } else {
+        // Standard positional centipawn score
+        format!("cp {}", score)
+    }
+}

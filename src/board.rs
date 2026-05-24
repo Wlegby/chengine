@@ -201,6 +201,25 @@ impl State {
         let mut white_count = 0;
         let mut black_count = 0;
 
+        let number_attacking_white = (self.black.all & self.white.attacks).count_ones() as i32;
+        let number_attacking_black = (self.white.all & self.black.attacks).count_ones() as i32;
+
+        let number_defended_white =
+            ((self.white.all & self.black.attacks) & self.white.attacks).count_ones() as i32;
+
+        let number_defended_black =
+            ((self.black.all & self.white.attacks) & self.black.attacks).count_ones() as i32;
+
+        white_count += number_attacking_white - number_defended_black;
+        black_count += number_attacking_black - number_defended_white;
+
+        if self.white.attacks & self.black.king != 0 {
+            white_count += 9
+        }
+        if self.black.attacks & self.white.king != 0 {
+            black_count += 9
+        }
+
         fn get_score(p: Piece) -> i32 {
             match p._type {
                 PType::Pawn => 1,
@@ -611,7 +630,7 @@ impl State {
                     remove_border_rook(EMPTY_PSEUDO_ROOK[idx], idx as u8),
                 ) as usize];
 
-            pins.push((moves & king_a_b & RAY_BETWEEN[king_idx][idx]).trailing_zeros() as usize);
+            pins.push((moves & king_a_b & RAY_BETWEEN.0[king_idx][idx]).trailing_zeros() as usize);
 
             queen &= queen - 1;
         }
@@ -741,10 +760,10 @@ impl State {
             let attacker_idx = attackers.trailing_zeros() as u64;
             check_mask = 1 << attacker_idx;
 
-            check_mask |= RAY_BETWEEN[king_idx as usize][attacker_idx as usize];
+            check_mask |= RAY_BETWEEN.0[king_idx as usize][attacker_idx as usize];
         }
 
-        let (board, other) = if self.white_to_move {
+        let (c_board, other) = if self.white_to_move {
             (self.white, self.black)
         } else {
             (self.black, self.white)
@@ -783,13 +802,13 @@ impl State {
             }
 
             if pins.contains(&idx) {
-                continue;
+                board &= RAY_BETWEEN.1[idx][c_board.king.trailing_zeros() as usize];
             }
 
-            let _move =
+            let mut m =
                 get_moves_from_move_board(board, idx as u64, piece._type, self.white_to_move);
 
-            moves.extend(_move);
+            moves.extend(m);
         }
 
         all_w_attacks |= EMPTY_PSEUDO_KING[self.white.king.trailing_zeros() as usize];

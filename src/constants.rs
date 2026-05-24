@@ -15,7 +15,7 @@ pub const PROMOTION_ROOK: u16 = 0b10 << 12;
 pub const PROMOTION_BISHOP: u16 = 0b11 << 12;
 pub const PROMOTION_KNIGHT: u16 = 0b100 << 12;
 
-pub const RAY_BETWEEN: [[u64; 64]; 64] = init_ray_between();
+pub const RAY_BETWEEN: ([[u64; 64]; 64], [[u64; 64]; 64]) = init_ray_between();
 
 pub const ZOBRIST: ZobristKeys = generate_zobrist();
 
@@ -81,8 +81,9 @@ const fn generate_zobrist() -> ZobristKeys {
     }
 }
 
-const fn init_ray_between() -> [[u64; 64]; 64] {
+const fn init_ray_between() -> ([[u64; 64]; 64], [[u64; 64]; 64]) {
     let mut table = [[0; 64]; 64];
+    let mut full_ray_table = [[0; 64]; 64];
     let mut sq1 = 0;
 
     while sq1 < 64 {
@@ -116,9 +117,30 @@ const fn init_ray_between() -> [[u64; 64]; 64] {
                     0
                 };
 
+                let f_step_r = dr != 0;
+                let f_step_f = df != 0;
+
                 let mut r = r1 + step_r;
                 let mut f = f1 + step_f;
+
+                let mut f_r = if !f_step_r {
+                    r1
+                } else if !f_step_f {
+                    0
+                } else {
+                    r1 - (if r1 > f1 { f1 } else { r1 })
+                };
+
+                let mut f_f = if !f_step_f {
+                    r1
+                } else if !f_step_r {
+                    0
+                } else {
+                    f1 - (if f1 > r1 { r1 } else { f1 })
+                };
+
                 let mut mask = 0u64;
+                let mut full_mask = 0u64;
 
                 // Step from sq1 towards sq2, flipping the bits in between,
                 // stopping strictly before we reach sq2.
@@ -127,6 +149,14 @@ const fn init_ray_between() -> [[u64; 64]; 64] {
                     r += step_r;
                     f += step_f;
                 }
+
+                while f_r < 8 && f_f < 8 && (f_step_r || f_step_f) {
+                    full_mask |= 1 << (f_r * 8 + f_f);
+                    f_r += (f_step_r as i8);
+                    f_f += (f_step_f as i8);
+                }
+
+                full_ray_table[sq1][sq2] = full_mask;
                 table[sq1][sq2] = mask;
             }
             sq2 += 1;
@@ -134,7 +164,7 @@ const fn init_ray_between() -> [[u64; 64]; 64] {
         sq1 += 1;
     }
 
-    table
+    (table, full_ray_table)
 }
 
 const fn generate_pseudo_king() -> [u64; 64] {
