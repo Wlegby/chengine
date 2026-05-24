@@ -91,8 +91,6 @@ fn start_uci() {
                 }
 
                 is_self_white = state.white_to_move;
-
-                display_bit_board(state.all_pieces);
             }
             UciMessage::Go { .. } => {
                 let mut state_clone = state.clone();
