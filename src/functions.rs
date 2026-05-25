@@ -15,6 +15,38 @@ use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
 
+pub fn score_move(state: &State, m: Move) -> i32 {
+    let from = (m & 0b111111) as usize;
+    let to = ((m & (0b111111 << 6)) >> 6) as usize;
+    let prom = m & (0b1111 << 12);
+
+    let mut score = 0;
+
+    // improve castling
+    if let Some(k) = state.pieces_list[from] {
+        if k._type == PType::King && from.abs_diff(to) == 2 {
+            score += 9000;
+        }
+    }
+
+    // improve queen promotion
+    if prom == PROMOTION_QUEEN {
+        score += 9000;
+    } else if prom != 0 {
+        score += 1000;
+    }
+
+    // improve capturing good pieces with bad pieces
+    if let Some(victim) = state.pieces_list[to] {
+        if let Some(attacker) = state.pieces_list[from] {
+            // Give a high base score for capturing, then add victim value and subtract attacker value
+            score += 10000 + victim.score() - attacker.score();
+        }
+    }
+
+    score
+}
+
 pub fn search(
     mut state: State,
     depth: u32,
@@ -24,7 +56,7 @@ pub fn search(
 ) -> (Option<Move>, i32) {
     // 1. Check if we have been ordered to stop
     if stop_flag.load(Ordering::Relaxed) {
-        return (None, 0);
+        return (None, state.evaluate());
     }
 
     if depth == 0 {
@@ -35,7 +67,8 @@ pub fn search(
         return (None, 0);
     }
 
-    let moves = state.get_moves();
+    let mut moves = state.get_moves();
+    moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
 
     if moves.is_empty() {
         let (board, other) = if state.white_to_move {
@@ -81,10 +114,6 @@ pub fn search(
         alpha = alpha.max(our_eval);
         if alpha >= beta {
             break; // Standard pruning
-        }
-
-        if our_eval > 1_000_000 {
-            break;
         }
     }
 

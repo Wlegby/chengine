@@ -5,11 +5,13 @@ mod board;
 mod constants;
 mod functions;
 mod qol;
+mod tt;
 
 use board::*;
 use constants::*;
 use functions::*;
 use qol::*;
+use tt::*;
 
 use rand::prelude::*;
 use rayon::prelude::*;
@@ -98,7 +100,9 @@ fn start_uci() {
                 // Spawn a new thread for the search
                 thread::spawn(move || {
                     let mut rng = rand::rng();
-                    let moves = state_clone.get_moves();
+                    let mut moves = state_clone.get_moves();
+
+                    moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
 
                     let mut best_move = None;
                     let mut final_eval = 0;

@@ -94,7 +94,23 @@ pub fn get_moves_from_move_board(
     moves
 }
 
+impl Piece {
+    pub fn score(&self) -> i32 {
+        self._type.score()
+    }
+}
+
 impl PType {
+    pub fn score(&self) -> i32 {
+        match self {
+            PType::Pawn => 1,
+            PType::Rook => 5,
+            PType::Knight => 3,
+            PType::Bishop => 3,
+            PType::Queen => 9,
+            PType::King => 0,
+        }
+    }
     pub fn sliding(&self) -> bool {
         match self {
             Self::Rook => true,
@@ -220,17 +236,6 @@ impl State {
             black_count += 9
         }
 
-        fn get_score(p: Piece) -> i32 {
-            match p._type {
-                PType::Pawn => 1,
-                PType::Rook => 5,
-                PType::Knight => 3,
-                PType::Bishop => 3,
-                PType::Queen => 9,
-                _ => panic!("Not supposed to be here"),
-            }
-        }
-
         for p in self.pieces_list {
             if let Some(p) = p {
                 let count = if p.white {
@@ -238,7 +243,7 @@ impl State {
                 } else {
                     &mut black_count
                 };
-                *count += get_score(p) as i32;
+                *count += p.score() as i32;
             }
         }
 
