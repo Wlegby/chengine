@@ -32,10 +32,7 @@ fn main() {
 }
 
 fn debug() {
-    let mut state = State::from_fen("4k3/5p2/6Q1/8/8/8/8/K7 b - - 0 1");
-
-    // let mut state = State::default();
-    state.white_to_move = false;
+    let mut state = State::from_fen("3r4/8/8/8/8/1k6/7q/2K5 w - - 0 1");
 
     let moves = state.get_moves();
 

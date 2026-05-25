@@ -82,6 +82,10 @@ pub fn search(
         if alpha >= beta {
             break; // Standard pruning
         }
+
+        if our_eval > 1_000_000 {
+            break;
+        }
     }
 
     (best_move, max_eval)
