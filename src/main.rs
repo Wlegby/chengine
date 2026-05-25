@@ -5,13 +5,11 @@ mod board;
 mod constants;
 mod functions;
 mod qol;
-mod tt;
 
 use board::*;
 use constants::*;
 use functions::*;
 use qol::*;
-use tt::*;
 
 use rand::prelude::*;
 use rayon::prelude::*;

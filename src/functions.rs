@@ -67,6 +67,10 @@ pub fn search(
         return (None, 0);
     }
 
+    if state.is_threefold_repetition() {
+        return (None, 0);
+    }
+
     let mut moves = state.get_moves();
     moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
 
