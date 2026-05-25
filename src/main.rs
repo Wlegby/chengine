@@ -80,6 +80,7 @@ fn start_uci() {
                 }
 
                 state.hash = state.calculate_initial_hash();
+                state.pos_history[state.history_idx] = state.hash;
 
                 for m in uci_moves {
                     let _move = uci_to_move(&m.to_string());

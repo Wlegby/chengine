@@ -147,7 +147,7 @@ impl Default for State {
 impl State {
     pub fn is_threefold_repetition(&self) -> bool {
         // if less than 4 moves it's impossible
-        if self.half_move_clock < 4 {
+        if self.history_idx < 4 {
             return false;
         }
 
@@ -316,6 +316,23 @@ impl State {
             _ => None,
         };
 
+        // remove old castling rights
+        let mut old_castling_idx = 0;
+        if self.white.castle_k {
+            old_castling_idx |= 1;
+        }
+        if self.white.castle_q {
+            old_castling_idx |= 2;
+        }
+        if self.black.castle_k {
+            old_castling_idx |= 4;
+        }
+        if self.black.castle_q {
+            old_castling_idx |= 8;
+        }
+        self.hash ^= ZOBRIST.castling[old_castling_idx];
+
+        // add new ones
         match from {
             0 => self.white.castle_q = false,
             4 => {
@@ -345,7 +362,6 @@ impl State {
         if self.black.castle_q {
             castling_idx |= 8;
         }
-
         self.hash ^= ZOBRIST.castling[castling_idx];
 
         let p = self.pieces_list[from];
@@ -355,6 +371,12 @@ impl State {
         } else {
             (&mut self.black, &mut self.white)
         };
+
+        // remove old en passant
+        if self.en_passant != 0 {
+            let ep_sq = self.en_passant.trailing_zeros() as usize;
+            self.hash ^= ZOBRIST.en_passant[ep_sq % 8];
+        }
 
         let mut reset_clock = false;
         let old_en_passant = self.en_passant;
@@ -392,7 +414,9 @@ impl State {
 
                 // if moves two forward update en_passant
                 if from.abs_diff(to) == 16 {
-                    self.en_passant = 1 << (from + to) / 2
+                    self.en_passant = 1 << (from + to) / 2;
+                    let ep_sq = self.en_passant.trailing_zeros() as usize;
+                    self.hash ^= ZOBRIST.en_passant[ep_sq % 8];
                 }
             }
 
@@ -491,7 +515,7 @@ impl State {
             } else {
                 color_board.king = 1 << to as u64;
 
-                // remove the take piece
+                // remove the taken piece
                 if let Some(p) = self.pieces_list[to] {
                     self.hash ^=
                         ZOBRIST.pieces[!self.white_to_move as usize][p._type.to_index()][to];
@@ -506,6 +530,9 @@ impl State {
                     other_color.queen &= !(1 << to);
                 }
 
+                self.hash ^=
+                    ZOBRIST.pieces[self.white_to_move as usize][PType::King.to_index()][to];
+
                 self.pieces_list[to] = None;
             }
         }
@@ -515,6 +542,7 @@ impl State {
         }
         self.update_all();
         self.white_to_move = !self.white_to_move;
+        self.hash ^= ZOBRIST.side_to_move;
 
         if reset_clock {
             self.pos_history = [0; 100];
