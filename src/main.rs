@@ -116,7 +116,7 @@ fn start_uci() {
                     let mut final_eval = 0;
 
                     // Iterative Deepening: Search from depth 1 to 7
-                    for depth in 1..=7 {
+                    for depth in 1..=8 {
                         // Search the rest of the tree single-threaded from here
                         let next_move = search(
                             state,
@@ -136,10 +136,10 @@ fn start_uci() {
                         // Otherwise, record the completed depth's best move
                         if let (Some(m), eval) = next_move {
                             best_move = Some(m);
-                            final_eval = eval;
+                            final_eval = -eval;
 
                             // print the info
-                            let score_string = format_uci_score(final_eval * 100);
+                            let score_string = format_uci_score(final_eval, depth);
                             let move_str = move_to_uci(m);
 
                             println!(

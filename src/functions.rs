@@ -85,7 +85,7 @@ pub fn search(
         };
 
         let score = if board.king & other.attacks != 0 {
-            -i32::MAX
+            -(2_000_000_000 + depth as i32)
         } else {
             0
         };
@@ -93,7 +93,7 @@ pub fn search(
     }
 
     let mut best_move = None;
-    let mut max_eval = -1_000_000;
+    let mut max_eval = -i32::MAX;
 
     for m in moves {
         if stop_flag.load(Ordering::Relaxed) {
@@ -431,19 +431,21 @@ pub fn fen_positions_to_bitboards(
     (white, black)
 }
 
-pub fn format_uci_score(score: i32) -> String {
+pub fn format_uci_score(score: i32, depth: u8) -> String {
     let mate_threshold = 900_000; // Example threshold
+                                  //
 
+    dbg!(score);
     if score > mate_threshold {
         // Engine is delivering mate.
         // Note: To get the exact moves until mate, you need to track
         // distance-from-root (ply) in your search function.
-        let moves_to_mate = (1_000_000 - score + 1) / 2;
-        format!("mate {}", moves_to_mate)
+        let mate_in = (score - 2_000_000_000 + 1) / 2;
+        format!("mate {}", 4 - mate_in.abs())
     } else if score < -mate_threshold {
         // Engine is getting mated.
-        let moves_to_mate = (-1_000_000 - score - 1) / 2;
-        format!("mate {}", moves_to_mate)
+        let mate_in = (-score - 2_000_000_000 + 1) / 2;
+        format!("mate {}", 4 - mate_in.abs())
     } else {
         // Standard positional centipawn score
         format!("cp {}", score)
