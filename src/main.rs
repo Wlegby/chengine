@@ -5,6 +5,7 @@ mod board;
 mod constants;
 mod functions;
 mod qol;
+mod tt;
 
 use board::*;
 use constants::*;
@@ -19,10 +20,13 @@ use std::io::{self, BufRead};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::time::Instant;
 use vampirc_uci::{parse_one, UciMessage};
+
+use crate::tt::TT;
 
 include!(concat!(env!("OUT_DIR"), "/tables.rs"));
 
@@ -44,6 +48,7 @@ fn debug() {
 fn start_uci() {
     let stdin = io::stdin();
     let mut state = State::default();
+    let tt = Arc::new(Mutex::new(TT::new(128)));
     let mut is_self_white = true;
 
     // Create a shared atomic flag to signal when to stop searching
@@ -96,10 +101,14 @@ fn start_uci() {
                 // Reset the stop flag
                 stop_search_clone.store(false, Ordering::Relaxed);
 
+                let tt_clone = Arc::clone(&tt);
+
                 // Spawn a new thread for the search
                 thread::spawn(move || {
                     let mut rng = rand::rng();
                     let mut moves = state_clone.get_moves();
+
+                    let mut locked_tt = tt_clone.lock().unwrap();
 
                     moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
 
@@ -108,34 +117,15 @@ fn start_uci() {
 
                     // Iterative Deepening: Search from depth 1 to 7
                     for depth in 1..=7 {
-                        // Split the first layer of moves across different cores
-                        let best_root_result = moves
-                            .par_iter()
-                            .filter_map(|&m| {
-                                // If we've been asked to stop, exit this branch early
-                                if stop_search_clone.load(Ordering::Relaxed) {
-                                    return None;
-                                }
-
-                                // Clone the state and make the root move
-                                let mut new_state = state_clone.clone();
-                                new_state.make_move(m);
-
-                                // Search the rest of the tree single-threaded from here
-                                let (_, opponent_eval) = search(
-                                    new_state,
-                                    depth - 1,
-                                    -i32::MAX, // Starting with open alpha/beta windows
-                                    i32::MAX,
-                                    &stop_search_clone,
-                                );
-
-                                let our_eval = -opponent_eval;
-
-                                // Return the move and its evaluated score
-                                Some((m, our_eval))
-                            })
-                            .max_by_key(|&(_, eval)| eval); // <-- Put them back together to return the best
+                        // Search the rest of the tree single-threaded from here
+                        let next_move = search(
+                            state,
+                            depth,
+                            -i32::MAX, // Starting with open alpha/beta windows
+                            i32::MAX,
+                            &stop_search_clone,
+                            &mut locked_tt,
+                        );
 
                         // If we were interrupted by a `stop` command, discard the
                         // incomplete results of this depth and break out.
@@ -144,7 +134,7 @@ fn start_uci() {
                         }
 
                         // Otherwise, record the completed depth's best move
-                        if let Some((m, eval)) = best_root_result {
+                        if let (Some(m), eval) = next_move {
                             best_move = Some(m);
                             final_eval = eval;
 

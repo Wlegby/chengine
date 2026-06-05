@@ -9,6 +9,8 @@ use crate::constants::PROMOTION_BISHOP;
 use crate::constants::PROMOTION_KNIGHT;
 use crate::constants::PROMOTION_QUEEN;
 use crate::constants::PROMOTION_ROOK;
+use crate::tt::TTEntry;
+use crate::tt::TT;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -49,10 +51,11 @@ pub fn score_move(state: &State, m: Move) -> i32 {
 
 pub fn search(
     mut state: State,
-    depth: u32,
+    depth: u8,
     mut alpha: i32,
     beta: i32,
     stop_flag: &AtomicBool,
+    tt: &mut TT,
 ) -> (Option<Move>, i32) {
     // 1. Check if we have been ordered to stop
     if stop_flag.load(Ordering::Relaxed) {
@@ -100,14 +103,35 @@ pub fn search(
         let mut new_state = state.clone();
         new_state.make_move(m);
 
+        let tt_index = tt.get_index(new_state.hash);
+
+        let position_seen = tt.is_empty(tt_index);
+
+        if position_seen {
+            let entry = tt.get_entry(tt_index);
+            if depth < entry.depth {
+                return (Some(entry.best_move), entry.score);
+            }
+        }
+
         // FIX 1: -beta, -alpha
-        let (_, opponent_eval) = search(new_state, depth - 1, -beta, -alpha, stop_flag);
+        let (best_next_move, opponent_eval) =
+            search(new_state, depth - 1, -beta, -alpha, stop_flag, tt);
 
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
 
         let our_eval = -opponent_eval;
+
+        if let Some(m) = best_next_move {
+            let new_entry = TTEntry {
+                hash: new_state.hash,
+                depth: depth,
+                score: our_eval,
+                best_move: m,
+            };
+        }
 
         // FIX 2: No more random tie_count
         if our_eval > max_eval {
