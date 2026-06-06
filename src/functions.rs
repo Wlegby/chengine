@@ -1,3 +1,4 @@
+use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
 
 use crate::board::ColorBoards;
@@ -12,10 +13,35 @@ use crate::constants::PROMOTION_ROOK;
 use crate::tt::TTEntry;
 use crate::tt::TT;
 
+use std::collections::HashMap;
+use std::error::Error;
+use std::fs;
+use std::io;
+use std::io::Write;
+use std::ops::Index;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
+
+pub fn king_to_corner_endgame(king_square: usize, other_king_square: usize, endgame: f32) -> i32 {
+    let mut eval = 0;
+
+    let (self_x, self_y) = (king_square as i32 % 8, king_square as i32 / 8);
+    let (other_x, other_y) = (other_king_square as i32 % 8, other_king_square as i32 / 8);
+
+    let dst_center_x = (3 - other_x).max(other_x - 4);
+    let dst_center_y = (3 - other_y).max(other_y - 4);
+    let tot_dist = dst_center_x + dst_center_y;
+    eval += tot_dist;
+
+    let dist_kings_x = (self_x - other_x).abs();
+    let dist_kings_y = (self_y - other_y).abs();
+    let tot_dist_kings = dist_kings_x + dist_kings_y;
+    eval += 14 - tot_dist_kings;
+
+    (eval as f32 * endgame * 10.) as i32
+}
 
 pub fn score_move(state: &State, m: Move) -> i32 {
     let from = (m & 0b111111) as usize;
@@ -158,7 +184,10 @@ pub fn uci_to_move(uci: &str) -> Move {
         'f' => 5,
         'g' => 6,
         'h' => 7,
-        _ => panic!("Expected valid uci"),
+        _ => {
+            println!("{uci}");
+            panic!("Expected valid uci");
+        }
     };
 
     let row_from = uci
@@ -197,7 +226,10 @@ pub fn uci_to_move(uci: &str) -> Move {
             'r' => PROMOTION_ROOK,
             'b' => PROMOTION_BISHOP,
             'n' => PROMOTION_KNIGHT,
-            _ => panic!("Expected valid uci"),
+            _ => {
+                println!("{uci}");
+                panic!("Expected valid uci")
+            }
         }
     } else {
         0

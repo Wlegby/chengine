@@ -12,9 +12,11 @@ use constants::*;
 use functions::*;
 use qol::*;
 
+use core::num;
 use rand::prelude::*;
 use rayon::prelude::*;
 use std::env;
+use std::env::args;
 use std::fs;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -36,12 +38,23 @@ fn main() {
 }
 
 fn debug() {
-    let mut state = State::from_fen("3r4/8/8/8/8/1k6/7q/2K5 w - - 0 1");
+    let mut state =
+        State::from_fen("r2q1rk1/4bppp/p1n2n2/1pp1pN2/P2pP3/2PP3P/1PB2PP1/R1BQR1K1 b - - 0 20");
 
-    let moves = state.get_moves();
+    let mut tt = TT::new(128);
+    let stop = AtomicBool::new(false);
 
-    for m in moves {
-        display_move(m);
+    let now = Instant::now();
+    let find = search(state, 4, -i32::MAX, i32::MAX, &stop, &mut tt);
+
+    let after = Instant::now() - now;
+
+    if let (Some(m), score) = find {
+        println!(
+            "Move: {}\nScore: {score}\nTook {:0.4}",
+            move_to_uci(m),
+            after.as_secs_f32()
+        );
     }
 }
 
@@ -88,7 +101,9 @@ fn start_uci() {
                 state.pos_history[state.history_idx] = state.hash;
 
                 for m in uci_moves {
-                    let _move = uci_to_move(&m.to_string());
+                    let mut move_string = m.to_string();
+
+                    let _move = uci_to_move(&move_string);
                     state.make_move(_move);
                 }
 
@@ -103,6 +118,8 @@ fn start_uci() {
 
                 let tt_clone = Arc::clone(&tt);
 
+                let max_depth = if state.endgame > 0.75 { 8 } else { 7 };
+
                 // Spawn a new thread for the search
                 thread::spawn(move || {
                     let mut rng = rand::rng();
@@ -110,13 +127,14 @@ fn start_uci() {
 
                     let mut locked_tt = tt_clone.lock().unwrap();
 
+                    println!("going depth {max_depth} (endgame: {})", state.endgame);
                     moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
 
                     let mut best_move = None;
                     let mut final_eval = 0;
 
                     // Iterative Deepening: Search from depth 1 to 7
-                    for depth in 1..=8 {
+                    for depth in 1..=max_depth {
                         // Search the rest of the tree single-threaded from here
                         let next_move = search(
                             state,
@@ -136,7 +154,7 @@ fn start_uci() {
                         // Otherwise, record the completed depth's best move
                         if let (Some(m), eval) = next_move {
                             best_move = Some(m);
-                            final_eval = -eval;
+                            final_eval = eval;
 
                             // print the info
                             let score_string = format_uci_score(final_eval, depth);

@@ -19,6 +19,7 @@ pub struct State {
     pub pos_history: [u64; 100],
     pub history_idx: usize,
     pub hash: u64,
+    pub endgame: f32,
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -33,6 +34,7 @@ pub struct ColorBoards {
     pub attacks: u64,
     pub castle_k: bool,
     pub castle_q: bool,
+    pub castled: i32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,11 +105,11 @@ impl Piece {
 impl PType {
     pub fn score(&self) -> i32 {
         match self {
-            PType::Pawn => 1,
-            PType::Rook => 5,
-            PType::Knight => 3,
-            PType::Bishop => 3,
-            PType::Queen => 9,
+            PType::Pawn => 100,
+            PType::Rook => 500,
+            PType::Knight => 300,
+            PType::Bishop => 300,
+            PType::Queen => 900,
             PType::King => 0,
         }
     }
@@ -226,25 +228,61 @@ impl State {
         let number_defended_black =
             ((self.black.all & self.white.attacks) & self.black.attacks).count_ones() as i32;
 
-        white_count += number_attacking_white - number_defended_black;
-        black_count += number_attacking_black - number_defended_white;
+        black_count += (number_attacking_black - number_defended_white) * 100;
+        white_count += (number_attacking_white - number_defended_black) * 100;
 
         if self.white.attacks & self.black.king != 0 {
-            white_count += 9
+            white_count += 900
         }
         if self.black.attacks & self.white.king != 0 {
-            black_count += 9
+            black_count += 900
         }
 
-        for p in self.pieces_list {
+        for (idx, p) in self.pieces_list.iter().enumerate() {
             if let Some(p) = p {
-                let count = if p.white {
-                    &mut white_count
+                let (count, position_score) = if p.white {
+                    let pos_score = match p._type {
+                        PType::Pawn => WHITE_PAWN[idx],
+                        PType::Knight => WHITE_KNIGHT[idx],
+                        PType::Rook => WHITE_ROOK[idx],
+                        PType::Bishop => WHITE_BISHOP[idx],
+                        PType::Queen => WHITE_QUEEN[idx],
+                        PType::King => WHITE_KING[idx],
+                    };
+
+                    (&mut white_count, pos_score)
                 } else {
-                    &mut black_count
+                    let pos_score = match p._type {
+                        PType::Pawn => BLACK_PAWN[idx],
+                        PType::Knight => BLACK_KNIGHT[idx],
+                        PType::Rook => BLACK_ROOK[idx],
+                        PType::Bishop => BLACK_BISHOP[idx],
+                        PType::Queen => BLACK_QUEEN[idx],
+                        PType::King => BLACK_KING[idx],
+                    };
+                    (&mut black_count, pos_score)
                 };
-                *count += p.score() as i32;
+                *count += p.score() as i32 + position_score;
             }
+        }
+
+        white_count += self.white.castled;
+        black_count += self.black.castled;
+
+        if self.endgame > 0.6 {
+            let endgame_white = king_to_corner_endgame(
+                self.white.king.trailing_zeros() as usize,
+                self.black.king.trailing_zeros() as usize,
+                self.endgame,
+            );
+
+            let endgame_black = king_to_corner_endgame(
+                self.black.king.trailing_zeros() as usize,
+                self.white.king.trailing_zeros() as usize,
+                self.endgame,
+            );
+            white_count += endgame_white;
+            black_count += endgame_black;
         }
 
         let (own, other) = if self.white_to_move {
@@ -476,9 +514,12 @@ impl State {
             //remove the king
             self.hash ^= ZOBRIST.pieces[self.white_to_move as usize][PType::King.to_index()][from];
 
+            // if caslte
             if from.abs_diff(to) == 2 {
-                // if caslte
                 let shift = if self.white_to_move { 0 } else { 56 };
+
+                color_board.castled = 100;
+
                 if from < to {
                     // king-side
                     color_board.king = 1 << to as u64;
@@ -541,6 +582,7 @@ impl State {
             self.full_move_clock += 1;
         }
         self.update_all();
+        self.update_endgame();
         self.white_to_move = !self.white_to_move;
         self.hash ^= ZOBRIST.side_to_move;
 
@@ -580,6 +622,7 @@ impl State {
         let all_pieces = white.all | black.all;
 
         let white_to_move = to_move == "w";
+        let endgame = 1. - ((pieces.len() as f32 - 3.).max(0.) / 30.);
 
         Self {
             white,
@@ -593,7 +636,12 @@ impl State {
             pos_history: [0; 100],
             history_idx: 0,
             hash: 0,
+            endgame,
         }
+    }
+    pub fn update_endgame(&mut self) {
+        let endgame = 1. - ((self.all_pieces.count_ones() as f32 - 5.).max(0.) / 30.);
+        self.endgame = endgame;
     }
 
     pub fn king_moves(&self, pos_idx: u64, white: bool) -> u64 {
