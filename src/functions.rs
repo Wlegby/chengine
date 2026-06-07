@@ -1,5 +1,6 @@
 use rand::rngs::ThreadRng;
 use rand::seq::IteratorRandom;
+use rand::RngExt;
 
 use crate::board::ColorBoards;
 use crate::board::Move;
@@ -89,7 +90,12 @@ pub fn search(
     }
 
     if depth == 0 {
-        return (None, state.evaluate());
+        let static_eval = state.evaluate();
+        let mut rng = rand::rng();
+
+        // random score for tiebreaking and hopefully making the engine not deterministic
+        let jitter = rng.random_range(-3..=3);
+        return (None, static_eval + jitter);
     }
 
     if state.half_move_clock == 99 {
@@ -100,10 +106,13 @@ pub fn search(
         return (None, 0);
     }
 
-    let mut moves = state.get_moves();
-    moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
+    let moves = state.get_moves();
+    let mut scored_moves: Vec<(Move, i32)> = moves
+        .into_iter()
+        .map(|m| (m, score_move(&state, m)))
+        .collect();
 
-    if moves.is_empty() {
+    if scored_moves.is_empty() {
         let (board, other) = if state.white_to_move {
             (state.white, state.black)
         } else {
@@ -121,10 +130,23 @@ pub fn search(
     let mut best_move = None;
     let mut max_eval = -i32::MAX;
 
-    for m in moves {
+    for i in 0..scored_moves.len() {
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
+
+        let mut best_idx = i;
+        let mut best_score = scored_moves[i].1;
+
+        for j in (i + 1)..scored_moves.len() {
+            if scored_moves[j].1 > best_score {
+                best_score = scored_moves[j].1;
+                best_idx = j;
+            }
+        }
+
+        scored_moves.swap(i, best_idx);
+        let m = scored_moves[i].0;
 
         let mut new_state = state.clone();
         new_state.make_move(m);
@@ -133,16 +155,22 @@ pub fn search(
 
         let position_seen = tt.is_empty(tt_index);
 
-        if position_seen {
+        let ((best_next_move, opponent_eval), entry_existed) = if position_seen {
             let entry = tt.get_entry(tt_index);
             if depth < entry.depth {
-                return (Some(entry.best_move), entry.score);
+                ((Some(entry.best_move), entry.score), true)
+            } else {
+                (
+                    search(new_state, depth - 1, -beta, -alpha, stop_flag, tt),
+                    false,
+                )
             }
-        }
-
-        // FIX 1: -beta, -alpha
-        let (best_next_move, opponent_eval) =
-            search(new_state, depth - 1, -beta, -alpha, stop_flag, tt);
+        } else {
+            (
+                search(new_state, depth - 1, -beta, -alpha, stop_flag, tt),
+                false,
+            )
+        };
 
         if stop_flag.load(Ordering::Relaxed) {
             break;
@@ -150,7 +178,7 @@ pub fn search(
 
         let our_eval = -opponent_eval;
 
-        if let Some(m) = best_next_move {
+        if !entry_existed && let Some(m) = best_next_move {
             let new_entry = TTEntry {
                 hash: new_state.hash,
                 depth: depth,
