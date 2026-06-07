@@ -61,7 +61,7 @@ fn debug() {
 fn start_uci() {
     let stdin = io::stdin();
     let mut state = State::default();
-    let tt = Arc::new(Mutex::new(TT::new(128)));
+    let tt = Arc::new(Mutex::new(TT::new(1024)));
     let mut is_self_white = true;
 
     // Create a shared atomic flag to signal when to stop searching
