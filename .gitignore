@@ -1,4 +1,3 @@
 target/
 Cargo.lock
-downloaded_book.pgn
-openings.uci
+books/

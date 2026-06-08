@@ -5,6 +5,10 @@ use std::process::Command;
 fn main() {
     let archive_dir = Path::new("engines_archive");
     let target_binary = Path::new("target/release/chengine"); // <- CHANGE TO YOUR ACTUAL BINARY NAME
+                                                              //
+                                                              //
+    let args: Vec<String> = std::env::args().collect();
+    let create_new_version = args.iter().any(|arg| arg == "--new");
 
     // 1. Ensure the archive directory exists
     if !archive_dir.exists() {
@@ -26,8 +30,16 @@ fn main() {
             }
         }
     }
+
     let next_version = max_version + 1;
-    let new_version_name = format!("chengine-v{}", next_version);
+    let new_version_name = format!(
+        "chengine-v{}",
+        if create_new_version {
+            next_version
+        } else {
+            max_version
+        }
+    );
     let destination = archive_dir.join(&new_version_name);
 
     // 3. Compile your engine via standard cargo build --release
