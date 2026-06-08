@@ -38,8 +38,7 @@ fn main() {
 }
 
 fn debug() {
-    let mut state =
-        State::from_fen("r2q1rk1/4bppp/p1n2n2/1pp1pN2/P2pP3/2PP3P/1PB2PP1/R1BQR1K1 b - - 0 20");
+    let mut state = State::from_fen("r3kb1r/pbn4p/1p3p1p/7R/2Bp4/pN6/2K2PP1/4R3 b kq - 1 23");
 
     let mut tt = TT::new(128);
     let stop = AtomicBool::new(false);
@@ -63,6 +62,8 @@ fn start_uci() {
     let mut state = State::default();
     let tt = Arc::new(Mutex::new(TT::new(1024)));
     let mut is_self_white = true;
+    let mut num_moves = 0;
+    let mut tree_search = false;
 
     // Create a shared atomic flag to signal when to stop searching
     let stop_search = Arc::new(AtomicBool::new(false));
@@ -113,77 +114,91 @@ fn start_uci() {
 
                     let _move = uci_to_move(&move_string);
                     state.make_move(_move);
+                    num_moves += 1;
                 }
 
                 is_self_white = state.white_to_move;
             }
             UciMessage::Go { .. } => {
-                let mut state_clone = state.clone();
-                let stop_search_clone = Arc::clone(&stop_search);
-
-                // Reset the stop flag
-                stop_search_clone.store(false, Ordering::Relaxed);
-
-                let tt_clone = Arc::clone(&tt);
-
-                let max_depth = if state.endgame > 0.75 { 8 } else { 7 };
-
-                // Spawn a new thread for the search
-                thread::spawn(move || {
-                    let mut rng = rand::rng();
-                    let mut moves = state_clone.get_moves();
-
-                    let mut locked_tt = tt_clone.lock().unwrap();
-
-                    println!("going depth {max_depth} (endgame: {})", state.endgame);
-                    moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
-
-                    let mut best_move = None;
-                    let mut final_eval = 0;
-
-                    // Iterative Deepening: Search from depth 1 to 7
-                    for depth in 1..=max_depth {
-                        // Search the rest of the tree single-threaded from here
-                        let next_move = search(
-                            state,
-                            depth,
-                            -i32::MAX, // Starting with open alpha/beta windows
-                            i32::MAX,
-                            &stop_search_clone,
-                            &mut locked_tt,
-                        );
-
-                        // If we were interrupted by a `stop` command, discard the
-                        // incomplete results of this depth and break out.
-                        if stop_search_clone.load(Ordering::Relaxed) {
-                            break;
-                        }
-
-                        // Otherwise, record the completed depth's best move
-                        if let (Some(m), eval) = next_move {
-                            best_move = Some(m);
-                            final_eval = eval;
-
-                            // print the info
-                            let score_string = format_uci_score(final_eval, depth);
-                            let move_str = move_to_uci(m);
-
-                            println!(
-                                "info depth {} score {} pv {}",
-                                depth, score_string, move_str
-                            );
-                        }
-                    }
-
-                    // Print the best move found before being stopped (or after full depth)
-                    if let Some(m) = best_move {
+                if num_moves <= 11 && !tree_search {
+                    if let Some(m) = lookup_move(state.hash) {
+                        println!("info depth 0 score 0 pv {}", move_to_uci(m));
                         println!("bestmove {}", move_to_uci(m));
-                    } else if let Some(&fallback_move) = moves.choose(&mut rng) {
-                        println!("bestmove {}", move_to_uci(fallback_move));
+                    } else {
+                        tree_search = true;
                     }
+                } else {
+                    tree_search = true;
+                }
 
-                    println!("the score was: {final_eval}");
-                });
+                if tree_search {
+                    let mut state_clone = state.clone();
+                    let stop_search_clone = Arc::clone(&stop_search);
+
+                    // Reset the stop flag
+                    stop_search_clone.store(false, Ordering::Relaxed);
+
+                    let tt_clone = Arc::clone(&tt);
+
+                    let max_depth = if state.endgame > 0.75 { 8 } else { 7 };
+
+                    // Spawn a new thread for the search
+                    thread::spawn(move || {
+                        let mut rng = rand::rng();
+                        let mut moves = state_clone.get_moves();
+
+                        let mut locked_tt = tt_clone.lock().unwrap();
+
+                        println!("going depth {max_depth} (endgame: {})", state.endgame);
+                        moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
+
+                        let mut best_move = None;
+                        let mut final_eval = 0;
+
+                        // Iterative Deepening: Search from depth 1 to 7
+                        for depth in 1..=max_depth {
+                            // Search the rest of the tree single-threaded from here
+                            let next_move = search(
+                                state,
+                                depth,
+                                -i32::MAX, // Starting with open alpha/beta windows
+                                i32::MAX,
+                                &stop_search_clone,
+                                &mut locked_tt,
+                            );
+
+                            // If we were interrupted by a `stop` command, discard the
+                            // incomplete results of this depth and break out.
+                            if stop_search_clone.load(Ordering::Relaxed) {
+                                break;
+                            }
+
+                            // Otherwise, record the completed depth's best move
+                            if let (Some(m), eval) = next_move {
+                                best_move = Some(m);
+                                final_eval = eval;
+
+                                // print the info
+                                let score_string = format_uci_score(final_eval, depth);
+                                let move_str = move_to_uci(m);
+
+                                println!(
+                                    "info depth {} score {} pv {}",
+                                    depth, score_string, move_str
+                                );
+                            }
+                        }
+
+                        // Print the best move found before being stopped (or after full depth)
+                        if let Some(m) = best_move {
+                            println!("bestmove {}", move_to_uci(m));
+                        } else if let Some(&fallback_move) = moves.choose(&mut rng) {
+                            println!("bestmove {}", move_to_uci(fallback_move));
+                        }
+
+                        println!("the score was: {final_eval}");
+                    });
+                }
             }
             UciMessage::Stop => {
                 // Tell the search thread to abort

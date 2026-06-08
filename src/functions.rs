@@ -1,4 +1,5 @@
 use rand::rngs::ThreadRng;
+use rand::seq::IndexedRandom;
 use rand::seq::IteratorRandom;
 use rand::RngExt;
 
@@ -24,6 +25,42 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(target_arch = "x86_64")]
 use std::arch::x86_64::_pext_u64;
+
+#[repr(C, packed)]
+struct BookEntry {
+    position_hash: u64, // 8 bytes Zobrist hash
+    num_moves: u8,
+    best_moves: [u16; 20],
+}
+
+static BOOK_DATA: &[u8] = include_bytes!("../books/opening_book-10.bin");
+
+pub fn lookup_move(current_zobrist_hash: u64) -> Option<u16> {
+    let entries = unsafe {
+        std::slice::from_raw_parts(
+            BOOK_DATA.as_ptr() as *const BookEntry,
+            BOOK_DATA.len() / std::mem::size_of::<BookEntry>(),
+        )
+    };
+
+    let mut rng = rand::rng();
+
+    match entries.binary_search_by_key(&current_zobrist_hash, |e| e.position_hash) {
+        Ok(index) => {
+            let range = entries[index].num_moves;
+            if range == 0 {
+                return None;
+            }
+            let mut choice = rng.random_range(0..range);
+            let m = entries[index].best_moves[choice as usize];
+            if m == 0 {
+                return None;
+            }
+            Some(m)
+        }
+        Err(_) => None,
+    }
+}
 
 pub fn king_to_corner_endgame(king_square: usize, other_king_square: usize, endgame: f32) -> i32 {
     let mut eval = 0;
@@ -505,7 +542,7 @@ pub fn format_uci_score(score: i32, depth: u8) -> String {
     } else if score < -mate_threshold {
         // Engine is getting mated.
         let mate_in = (-score - 2_000_000_000 + 1) / 2;
-        format!("mate {}", 4 - mate_in.abs())
+        format!("mate -{}", 4 - mate_in.abs())
     } else {
         // Standard positional centipawn score
         format!("cp {}", score)

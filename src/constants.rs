@@ -1,4 +1,9 @@
-use crate::{functions::remove_border, functions::remove_border_rook};
+use std::collections::HashMap;
+
+use crate::{
+    board::Move,
+    functions::{remove_border, remove_border_rook},
+};
 
 pub const EMPTY_PSEUDO_ROOK: [u64; 64] = generate_pseudo_rook();
 pub const EMPTY_PSEUDO_BISHOP: [u64; 64] = generate_pseudo_bishop();
