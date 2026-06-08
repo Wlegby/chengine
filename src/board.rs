@@ -518,7 +518,7 @@ impl State {
             if from.abs_diff(to) == 2 {
                 let shift = if self.white_to_move { 0 } else { 56 };
 
-                color_board.castled = 100;
+                color_board.castled = 5;
 
                 if from < to {
                     // king-side

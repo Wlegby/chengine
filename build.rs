@@ -8,7 +8,52 @@ pub const EMPTY_PSEUDO_BISHOP: [u64; 64] = generate_pseudo_bishop();
 pub const EMPTY_PSEUDO_KNIGHT: [u64; 64] = generate_pseudo_knight();
 pub const EMPTY_PSEUDO_KING: [u64; 64] = generate_pseudo_king();
 
+fn build_into_versions() {
+    let archive_dir = Path::new("engines_archive");
+
+    // Ensure the archive directory exists
+    if !archive_dir.exists() {
+        fs::create_dir_all(archive_dir).unwrap();
+    }
+
+    // 2. Scan the archive folder to find the highest 'version_X'
+    let mut max_version = 0;
+    if let Ok(entries) = fs::read_dir(archive_dir) {
+        for entry in entries.flatten() {
+            if let Some(file_name) = entry.file_name().to_str() {
+                if file_name.starts_with("version_") {
+                    // Extract the number part from "version_X"
+                    if let Ok(num) = file_name["version_".len()..].parse::<u32>() {
+                        if num > max_version {
+                            max_version = num;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let next_version = max_version + 1;
+    let new_version_name = format!("version_{}", next_version);
+
+    // 3. Inject this version number into your code as an environment variable
+    // This allows your engine's UCI "id name" to print the correct version!
+    println!("cargo:rustc-env=ENGINE_VERSION={}", new_version_name);
+
+    // 4. Instruct Cargo to copy the binary AFTER compilation finishes.
+    // Because build.rs runs *before* the binary is generated, we use a trick:
+    // We tell Cargo to pass the version name downstream so we can copy it,
+    // OR we can trigger a small script copy.
+    // However, the cleanest native Rust way to do a post-build action without external tools
+    // is to write a tiny helper inside your main.rs, or use a custom Cargo runner.
+
+    // To keep it strictly to `cargo b -r`, let's pass the next version to the binary:
+    println!("cargo:rustc-env=NEXT_VERSION_NUM={}", next_version);
+}
+
 fn main() {
+    build_into_versions();
+
     // 1. Tell Cargo to rerun this script if build.rs changes
     println!("cargo:rerun-if-changed=build.rs");
 

@@ -1,0 +1,2 @@
+[alias]
+archive = "run --package xtask"

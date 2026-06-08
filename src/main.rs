@@ -73,9 +73,17 @@ fn start_uci() {
 
         match message {
             UciMessage::Uci => {
-                println!("id name Rookery");
-                println!("id author Wlegby");
-                println!("uciok");
+                let mut args = args();
+                args.next();
+                if let Some(version) = args.next() {
+                    println!("id name Chengine-v{}", version);
+                    println!("id author Wlegby");
+                    println!("uciok");
+                } else {
+                    println!("id name Chengine-vUNKNOWN");
+                    println!("id author Wlegby");
+                    println!("uciok");
+                }
             }
             UciMessage::IsReady => {
                 println!("readyok");
