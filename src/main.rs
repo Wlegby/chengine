@@ -40,20 +40,13 @@ fn main() {
 fn debug() {
     let mut state = State::from_fen("r3kb1r/pbn4p/1p3p1p/7R/2Bp4/pN6/2K2PP1/4R3 b kq - 1 23");
 
-    let mut tt = TT::new(128);
-    let stop = AtomicBool::new(false);
+    let moves = state.get_moves();
 
-    let now = Instant::now();
-    let find = search(state, 4, -i32::MAX, i32::MAX, &stop, &mut tt);
+    display_bit_board(state.all_pieces);
+    display_bit_board(state.white.attacks);
 
-    let after = Instant::now() - now;
-
-    if let (Some(m), score) = find {
-        println!(
-            "Move: {}\nScore: {score}\nTook {:0.4}",
-            move_to_uci(m),
-            after.as_secs_f32()
-        );
+    for m in moves {
+        display_move(m);
     }
 }
 

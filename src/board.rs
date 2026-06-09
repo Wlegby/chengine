@@ -966,7 +966,7 @@ impl State {
             }
         }
         if board.castle_q {
-            if (0b1100 << shift) & other.attacks == 0 && (0b1110 << shift) & self.all_pieces == 0 {
+            if (0b11100 << shift) & other.attacks == 0 && (0b1110 << shift) & self.all_pieces == 0 {
                 castle.1 = true
             }
         }
