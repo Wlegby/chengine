@@ -47,7 +47,7 @@ done
 
 # 5. Add the final match parameters
 FASTCHESS_ARGS+=(
-  "-rounds" "2"
+  "-rounds" "4"
   "-concurrency" "6"
   "-pgnout" "file=$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
 )
