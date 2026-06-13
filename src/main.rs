@@ -212,7 +212,7 @@ fn start_uci() {
                             if depth == max_depth - 1 {
                                 let dt = Instant::now() - time_start;
                                 // extend max_depth if it didn't take long enough
-                                if dt < Duration::from_millis(1500) {
+                                if dt < Duration::from_millis(2000) {
                                     max_depth += 1;
                                 }
                             }
