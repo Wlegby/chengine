@@ -113,7 +113,7 @@ fn start_uci() {
                 is_self_white = state.white_to_move;
             }
             UciMessage::Go { .. } => {
-                if num_moves <= 11 && !tree_search {
+                if num_moves <= 15 && !tree_search {
                     if let Some(m) = lookup_move(state.hash) {
                         println!("info depth 0 score 0 pv {}", move_to_uci(m));
                         println!("bestmove {}", move_to_uci(m));
@@ -133,7 +133,7 @@ fn start_uci() {
 
                     let tt_clone = Arc::clone(&tt);
 
-                    let max_depth = if state.endgame > 0.75 { 8 } else { 7 };
+                    let mut max_depth = if state.endgame > 0.75 { 8 } else { 7 };
 
                     // Spawn a new thread for the search
                     thread::spawn(move || {
@@ -148,8 +148,11 @@ fn start_uci() {
                         let mut best_move = None;
                         let mut final_eval = 0;
 
+                        let mut depth = 0;
+                        let time_start = Instant::now();
+
                         // Iterative Deepening: Search from depth 1 to 7
-                        for depth in 1..=max_depth {
+                        while depth < max_depth {
                             // Search the rest of the tree single-threaded from here
                             let next_move = search(
                                 state,
@@ -171,6 +174,10 @@ fn start_uci() {
                                 best_move = Some(m);
                                 final_eval = eval;
 
+                                if final_eval >= 900_000 {
+                                    break;
+                                }
+
                                 // print the info
                                 let score_string = format_uci_score(final_eval, depth);
                                 let move_str = move_to_uci(m);
@@ -180,6 +187,16 @@ fn start_uci() {
                                     depth, score_string, move_str
                                 );
                             }
+
+                            if depth == max_depth - 1 {
+                                let dt = Instant::now() - time_start;
+                                // extend max_depth if it didn't take long enough
+                                if dt < Duration::from_millis(1500) {
+                                    max_depth += 1;
+                                }
+                            }
+
+                            depth += 1;
                         }
 
                         // Print the best move found before being stopped (or after full depth)
