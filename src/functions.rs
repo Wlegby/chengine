@@ -33,7 +33,7 @@ struct BookEntry {
     best_moves: [u16; 20],
 }
 
-static BOOK_DATA: &[u8] = include_bytes!("../books/opening_book-10.bin");
+static BOOK_DATA: &[u8] = include_bytes!("../books/opening_book.bin");
 
 pub fn lookup_move(current_zobrist_hash: u64) -> Option<u16> {
     let entries = unsafe {
