@@ -133,7 +133,7 @@ fn start_uci() {
 
                     let tt_clone = Arc::clone(&tt);
 
-                    let mut max_depth = if state.endgame > 0.75 { 8 } else { 7 };
+                    let mut max_depth = if state.endgame > 0.75 { 12 } else { 10 };
 
                     // Spawn a new thread for the search
                     thread::spawn(move || {
