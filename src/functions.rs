@@ -205,14 +205,14 @@ pub fn search(
         .map(|m| (m, score_move(&state, m, tt_move)))
         .collect();
 
+    let (board, other) = if state.white_to_move {
+        (state.white, state.black)
+    } else {
+        (state.black, state.white)
+    };
+
     // Checkmate / Stalemate detection
     if scored_moves.is_empty() {
-        let (board, other) = if state.white_to_move {
-            (state.white, state.black)
-        } else {
-            (state.black, state.white)
-        };
-
         let score = if board.king & other.attacks != 0 {
             -(2_000_000_000 + depth as i32) // Prioritize shorter mates
         } else {
@@ -245,7 +245,20 @@ pub fn search(
         let mut new_state = state.clone();
         new_state.make_move(m);
 
-        let (_, opponent_eval) = search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes);
+        let is_quiet = state.pieces_list[(m as usize & 0b111111_000000) >> 6].is_none()
+            && (m as usize & 0b1111_000000_000000) == 0;
+
+        let (_, opponent_eval) = if i >= 4
+            && depth >= 3
+            && is_quiet
+            && board.attacks & other.king == 0
+            && board.king & other.king == 0
+        {
+            search(new_state, depth - 2, -beta, -alpha, stop_flag, tt, nodes)
+        } else {
+            search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes)
+        };
+
         let our_eval = -opponent_eval;
 
         if stop_flag.load(Ordering::Relaxed) {
