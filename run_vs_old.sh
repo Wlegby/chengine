@@ -27,7 +27,7 @@ echo "-------------------------------------------------------------"
 # 3. Build the Cutechess arguments dynamically
 CUTECHESS_ARGS=(
   "-tournament" "gauntlet"
-  "-engine" "cmd=$NEW_ENGINE_PATH" "name=$NEW_ENGINE_NAME"
+  "-engine" "cmd=$NEW_ENGINE_PATH" "name=$NEW_ENGINE_NAME" "proto=uci"
 )
 
 # 4. Loop through all older versions (from 1 up to LAST_VERSION - 1)
@@ -37,7 +37,7 @@ for ((i = 1; i < LAST_VERSION; i++)); do
 
   # Only add the engine if the file actually exists and is executable
   if [[ -x "$OPP_PATH" ]]; then
-    CUTECHESS_ARGS+=("-engine" "cmd=$OPP_PATH" "name=$OPP_NAME")
+    CUTECHESS_ARGS+=("-engine" "cmd=$OPP_PATH" "name=$OPP_NAME" "proto=uci")
     echo "Added opponent: $OPP_NAME"
   else
     echo "⚠️ Warning: $OPP_PATH not found or not executable. Skipping."
@@ -45,11 +45,10 @@ for ((i = 1; i < LAST_VERSION; i++)); do
 done
 
 # 5. Add the match constraints and UNLIMITED time controls
-# Choose ONE of the options below inside the array:
 CUTECHESS_ARGS+=(
   "-each" "tc=inf"
-  "-rounds" "4"
-  "-concurrency" "6"
+  "-rounds" "8"
+  "-concurrency" "8"
   "-pgnout" "$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
 )
 
