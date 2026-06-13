@@ -120,7 +120,10 @@ pub fn search(
     beta: i32,
     stop_flag: &AtomicBool,
     tt: &mut TT,
+    nodes: &mut u64,
 ) -> (Option<Move>, i32) {
+    *nodes += 1;
+
     // 1. Check if we have been ordered to stop
     if stop_flag.load(Ordering::Relaxed) {
         return (None, state.evaluate());
@@ -198,13 +201,13 @@ pub fn search(
                 ((Some(entry.best_move), entry.score), true)
             } else {
                 (
-                    search(new_state, depth - 1, -beta, -alpha, stop_flag, tt),
+                    search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes),
                     false,
                 )
             }
         } else {
             (
-                search(new_state, depth - 1, -beta, -alpha, stop_flag, tt),
+                search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes),
                 false,
             )
         };

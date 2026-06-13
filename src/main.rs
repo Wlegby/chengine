@@ -150,6 +150,7 @@ fn start_uci() {
 
                         let mut depth = 0;
                         let time_start = Instant::now();
+                        let mut nodes = 0;
 
                         // Iterative Deepening: Search from depth 1 to 7
                         while depth < max_depth {
@@ -161,6 +162,7 @@ fn start_uci() {
                                 i32::MAX,
                                 &stop_search_clone,
                                 &mut locked_tt,
+                                &mut nodes,
                             );
 
                             // If we were interrupted by a `stop` command, discard the
@@ -181,10 +183,15 @@ fn start_uci() {
                                 // print the info
                                 let score_string = format_uci_score(final_eval, depth);
                                 let move_str = move_to_uci(m);
+                                let dt = Instant::now() - time_start;
 
                                 println!(
-                                    "info depth {} score {} pv {}",
-                                    depth, score_string, move_str
+                                    "info depth {} score {} time {} nodes {} pv {}",
+                                    depth,
+                                    score_string,
+                                    dt.as_millis(),
+                                    nodes,
+                                    move_str
                                 );
                             }
 
