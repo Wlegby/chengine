@@ -47,7 +47,7 @@ done
 # 5. Add the match constraints and UNLIMITED time controls
 CUTECHESS_ARGS+=(
   "-each" "tc=inf"
-  "-rounds" "8"
+  "-rounds" "20"
   "-concurrency" "8"
   "-pgnout" "$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
 )
