@@ -142,8 +142,22 @@ fn start_uci() {
 
                         let mut locked_tt = tt_clone.lock().unwrap();
 
+                        let idx = locked_tt.get_index(state.hash);
+                        let tt_entry = if !locked_tt.is_empty(idx) {
+                            let entry = locked_tt.get_entry(idx);
+                            if entry.hash == state.hash {
+                                Some(locked_tt.get_entry(idx).best_move)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                         println!("going depth {max_depth} (endgame: {})", state.endgame);
-                        moves.sort_unstable_by_key(|&m| std::cmp::Reverse(score_move(&state, m)));
+                        moves.sort_unstable_by_key(|&m| {
+                            std::cmp::Reverse(score_move(&state, m, None))
+                        });
 
                         let mut best_move = None;
                         let mut final_eval = 0;

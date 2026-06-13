@@ -25,6 +25,7 @@ use crate::constants::WHITE_PAWN;
 use crate::constants::WHITE_QUEEN;
 use crate::constants::WHITE_ROOK;
 use crate::tt::TTEntry;
+use crate::tt::TTFlag;
 use crate::tt::TT;
 
 use std::collections::HashMap;
@@ -93,7 +94,11 @@ pub fn king_to_corner_endgame(king_square: usize, other_king_square: usize, endg
     (eval as f32 * endgame * 10.) as i32
 }
 
-pub fn score_move(state: &State, m: Move) -> i32 {
+pub fn score_move(state: &State, m: Move, tt_move: Option<Move>) -> i32 {
+    if Some(m) == tt_move {
+        return 100_000_000;
+    }
+
     let from = (m & 0b111111) as usize;
     let to = ((m & (0b111111 << 6)) >> 6) as usize;
     let prom = m & (0b1111 << 12);
@@ -156,41 +161,51 @@ pub fn search(
     mut state: State,
     depth: u8,
     mut alpha: i32,
-    beta: i32,
+    mut beta: i32,
     stop_flag: &AtomicBool,
     tt: &mut TT,
     nodes: &mut u64,
 ) -> (Option<Move>, i32) {
     *nodes += 1;
 
-    // 1. Check if we have been ordered to stop
     if stop_flag.load(Ordering::Relaxed) {
         return (None, state.evaluate());
     }
 
+    if state.half_move_clock >= 99 || state.is_threefold_repetition() {
+        return (None, 0);
+    }
+
+    let tt_index = tt.get_index(state.hash);
+    let mut tt_move = None;
+
+    if !tt.is_empty(tt_index) {
+        let entry = tt.get_entry(tt_index);
+        if entry.hash == state.hash {
+            tt_move = Some(entry.best_move);
+            if entry.depth >= depth {
+                // Check if the stored bounds allow a safe cutoff
+                match entry.flag {
+                    TTFlag::Exact => return (Some(entry.best_move), entry.score),
+                    TTFlag::Alpha if entry.score <= alpha => return (Some(entry.best_move), alpha),
+                    TTFlag::Beta if entry.score >= beta => return (Some(entry.best_move), beta),
+                    _ => {} // Window doesn't match, must search anyway
+                }
+            }
+        }
+    }
+
     if depth == 0 {
-        let static_eval = state.evaluate();
-        let mut rng = rand::rng();
-
-        // random score for tiebreaking and hopefully making the engine not deterministic
-        let jitter = rng.random_range(-3..=3);
-        return (None, static_eval + jitter);
-    }
-
-    if state.half_move_clock == 99 {
-        return (None, 0);
-    }
-
-    if state.is_threefold_repetition() {
-        return (None, 0);
+        return (None, state.evaluate());
     }
 
     let moves = state.get_moves();
     let mut scored_moves: Vec<(Move, i32)> = moves
         .into_iter()
-        .map(|m| (m, score_move(&state, m)))
+        .map(|m| (m, score_move(&state, m, tt_move)))
         .collect();
 
+    // Checkmate / Stalemate detection
     if scored_moves.is_empty() {
         let (board, other) = if state.white_to_move {
             (state.white, state.black)
@@ -199,82 +214,74 @@ pub fn search(
         };
 
         let score = if board.king & other.attacks != 0 {
-            -(2_000_000_000 + depth as i32)
+            -(2_000_000_000 + depth as i32) // Prioritize shorter mates
         } else {
-            0
+            0 // Stalemate
         };
         return (None, score);
     }
 
     let mut best_move = None;
     let mut max_eval = -i32::MAX;
+    let old_alpha = alpha;
 
     for i in 0..scored_moves.len() {
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
 
+        // Selection sort on the fly for move ordering
         let mut best_idx = i;
         let mut best_score = scored_moves[i].1;
-
         for j in (i + 1)..scored_moves.len() {
             if scored_moves[j].1 > best_score {
                 best_score = scored_moves[j].1;
                 best_idx = j;
             }
         }
-
         scored_moves.swap(i, best_idx);
         let m = scored_moves[i].0;
 
         let mut new_state = state.clone();
         new_state.make_move(m);
 
-        let tt_index = tt.get_index(new_state.hash);
-
-        let position_seen = tt.is_empty(tt_index);
-
-        let ((best_next_move, opponent_eval), entry_existed) = if position_seen {
-            let entry = tt.get_entry(tt_index);
-            if depth < entry.depth {
-                ((Some(entry.best_move), entry.score), true)
-            } else {
-                (
-                    search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes),
-                    false,
-                )
-            }
-        } else {
-            (
-                search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes),
-                false,
-            )
-        };
+        let (_, opponent_eval) = search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes);
+        let our_eval = -opponent_eval;
 
         if stop_flag.load(Ordering::Relaxed) {
             break;
         }
 
-        let our_eval = -opponent_eval;
-
-        if !entry_existed && let Some(m) = best_next_move {
-            let new_entry = TTEntry {
-                hash: new_state.hash,
-                depth: depth,
-                score: our_eval,
-                best_move: m,
-            };
-        }
-
-        // FIX 2: No more random tie_count
         if our_eval > max_eval {
             max_eval = our_eval;
             best_move = Some(m);
         }
 
         alpha = alpha.max(our_eval);
+
         if alpha >= beta {
-            break; // Standard pruning
+            break;
+        }
+    }
+
+    // 5. Store result in Transposition Table if search wasn't aborted
+    if !stop_flag.load(Ordering::Relaxed) {
+        if let Some(m) = best_move {
+            let flag = if max_eval >= beta {
+                TTFlag::Beta
+            } else if max_eval > old_alpha {
+                TTFlag::Exact
+            } else {
+                TTFlag::Alpha
+            };
+
+            tt.add_entry(TTEntry {
+                hash: state.hash,
+                depth,
+                score: max_eval,
+                best_move: m,
+                flag,
+            });
         }
     }
 

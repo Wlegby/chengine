@@ -1,9 +1,18 @@
 use crate::board::Move;
 
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum TTFlag {
+    #[default]
+    Exact,
+    Alpha, // Fail-low
+    Beta,  // Fail-high
+}
+
 #[derive(Default, Debug, Clone, Copy)]
 pub struct TTEntry {
     pub hash: u64,
     pub depth: u8,
+    pub flag: TTFlag,
     pub score: i32,
     pub best_move: Move,
 }
