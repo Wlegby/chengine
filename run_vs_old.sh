@@ -24,11 +24,10 @@ NEW_ENGINE_PATH="$ARCHIVE_DIR/$NEW_ENGINE_NAME"
 echo "⚔️ Prepping gauntlet: $NEW_ENGINE_NAME VS older versions"
 echo "-------------------------------------------------------------"
 
-# 3. Build the Fastchess arguments dynamically
-# We use a bash array so we can cleanly add as many opponents as needed
-FASTCHESS_ARGS=(
+# 3. Build the Cutechess arguments dynamically
+CUTECHESS_ARGS=(
   "-tournament" "gauntlet"
-  "-engine" "cmd=$NEW_ENGINE_PATH" "name=$NEW_ENGINE_NAME" "st=5000"
+  "-engine" "cmd=$NEW_ENGINE_PATH" "name=$NEW_ENGINE_NAME"
 )
 
 # 4. Loop through all older versions (from 1 up to LAST_VERSION - 1)
@@ -38,24 +37,26 @@ for ((i = 1; i < LAST_VERSION; i++)); do
 
   # Only add the engine if the file actually exists and is executable
   if [[ -x "$OPP_PATH" ]]; then
-    FASTCHESS_ARGS+=("-engine" "cmd=$OPP_PATH" "name=$OPP_NAME" "st=5000")
+    CUTECHESS_ARGS+=("-engine" "cmd=$OPP_PATH" "name=$OPP_NAME")
     echo "Added opponent: $OPP_NAME"
   else
     echo "⚠️ Warning: $OPP_PATH not found or not executable. Skipping."
   fi
 done
 
-# 5. Add the final match parameters
-FASTCHESS_ARGS+=(
+# 5. Add the match constraints and UNLIMITED time controls
+# Choose ONE of the options below inside the array:
+CUTECHESS_ARGS+=(
+  "-each" "tc=inf"
   "-rounds" "4"
   "-concurrency" "6"
-  "-pgnout" "file=$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
+  "-pgnout" "$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
 )
 
 echo "-------------------------------------------------------------"
-echo "Starting Fastchess..."
+echo "Starting Cutechess..."
 
-# 6. Run Fastchess using the array of arguments
-fastchess "${FASTCHESS_ARGS[@]}"
+# 6. Run Cutechess using the array of arguments
+cutechess-cli "${CUTECHESS_ARGS[@]}"
 
 echo "Matches finished!"
