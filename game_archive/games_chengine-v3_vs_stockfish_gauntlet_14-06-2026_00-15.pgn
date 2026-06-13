@@ -1,0 +1,40 @@
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.06.14"]
+[Round "1"]
+[White "SF_1800"]
+[Black "chengine-v3"]
+[Result "0-1"]
+[GameDuration "00:00:09"]
+[GameStartTime "2026-06-14T00:15:38 +0200"]
+[GameEndTime "2026-06-14T00:15:48 +0200"]
+[PlyCount "5"]
+[Termination "time forfeit"]
+[WhiteTimeControl "3/move"]
+[BlackTimeControl "5000/move"]
+[ECO "A40"]
+[Opening "Queen's Pawn Game: Modern Defense"]
+
+1. d4 {+0.34/21 2.996s} g6 {ERR/0 0.007s} 2. c4 {+0.73/21 2.999s}
+d6 {ERR/0 0.000s} 3. g3 {+0.61/20 3.020s, White loses on time} 0-1
+
+[Event "Fastchess Tournament"]
+[Site "?"]
+[Date "2026.06.14"]
+[Round "1"]
+[White "chengine-v3"]
+[Black "SF_1800"]
+[Result "1-0"]
+[GameDuration "00:00:13"]
+[GameStartTime "2026-06-14T00:15:38 +0200"]
+[GameEndTime "2026-06-14T00:15:53 +0200"]
+[PlyCount "4"]
+[Termination "time forfeit"]
+[WhiteTimeControl "5000/move"]
+[BlackTimeControl "3/move"]
+[ECO "A15"]
+[Opening "English Opening: Anglo-Indian Defense, King's Knight Variation"]
+
+1. Nf3 {ERR/0 0.000s} Nf6 {-0.31/20 3.000s} 2. c4 {+0.01/10 7.230s}
+c5 {-0.35/20 3.005s, Black loses on time} 1-0
+
