@@ -45,11 +45,10 @@ for ((i = 1; i < LAST_VERSION; i++)); do
 done
 
 # 5. Add the match constraints and UNLIMITED time controls
-# Choose ONE of the options below inside the array:
 CUTECHESS_ARGS+=(
   "-each" "tc=inf"
-  "-rounds" "4"
-  "-concurrency" "6"
+  "-rounds" "8"
+  "-concurrency" "8"
   "-pgnout" "$GAME_ARCHIVE_DIR/games_${NEW_ENGINE_NAME}_vs_older_${DATE}.pgn"
 )
 
