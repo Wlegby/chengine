@@ -8,10 +8,22 @@ use crate::board::Move;
 use crate::board::PType;
 use crate::board::Piece;
 use crate::board::State;
+use crate::constants::BLACK_BISHOP;
+use crate::constants::BLACK_KING;
+use crate::constants::BLACK_KNIGHT;
+use crate::constants::BLACK_PAWN;
+use crate::constants::BLACK_QUEEN;
+use crate::constants::BLACK_ROOK;
 use crate::constants::PROMOTION_BISHOP;
 use crate::constants::PROMOTION_KNIGHT;
 use crate::constants::PROMOTION_QUEEN;
 use crate::constants::PROMOTION_ROOK;
+use crate::constants::WHITE_BISHOP;
+use crate::constants::WHITE_KING;
+use crate::constants::WHITE_KNIGHT;
+use crate::constants::WHITE_PAWN;
+use crate::constants::WHITE_QUEEN;
+use crate::constants::WHITE_ROOK;
 use crate::tt::TTEntry;
 use crate::tt::TT;
 
@@ -101,6 +113,33 @@ pub fn score_move(state: &State, m: Move) -> i32 {
     } else if prom != 0 {
         score += 1000;
     }
+
+    let position_buf = match state.pieces_list[from] {
+        Some(p) => {
+            if p.white {
+                match p._type {
+                    PType::Pawn => WHITE_PAWN[from],
+                    PType::Rook => WHITE_ROOK[from],
+                    PType::Bishop => WHITE_BISHOP[from],
+                    PType::Queen => WHITE_QUEEN[from],
+                    PType::King => WHITE_KING[from],
+                    PType::Knight => WHITE_KNIGHT[from],
+                }
+            } else {
+                match p._type {
+                    PType::Pawn => BLACK_PAWN[from],
+                    PType::Rook => BLACK_ROOK[from],
+                    PType::Bishop => BLACK_BISHOP[from],
+                    PType::Queen => BLACK_QUEEN[from],
+                    PType::King => BLACK_KING[from],
+                    PType::Knight => BLACK_KNIGHT[from],
+                }
+            }
+        }
+        None => 0,
+    };
+
+    score += position_buf;
 
     // improve capturing good pieces with bad pieces
     if let Some(victim) = state.pieces_list[to] {
