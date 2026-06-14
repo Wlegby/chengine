@@ -593,8 +593,6 @@ pub fn fen_positions_to_bitboards(
 pub fn format_uci_score(score: i32, depth: u8) -> String {
     let mate_threshold = 900_000; // Example threshold
                                   //
-
-    dbg!(score);
     if score > mate_threshold {
         // Engine is delivering mate.
         // Note: To get the exact moves until mate, you need to track
