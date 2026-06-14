@@ -133,7 +133,7 @@ fn start_uci() {
 
                     let tt_clone = Arc::clone(&tt);
 
-                    let mut max_depth = if state.endgame > 0.75 { 13 } else { 11 };
+                    let mut max_depth = if state.endgame > 0.75 { 8 } else { 7 };
 
                     // Spawn a new thread for the search
                     thread::spawn(move || {
@@ -212,7 +212,7 @@ fn start_uci() {
                             if depth == max_depth - 1 {
                                 let dt = Instant::now() - time_start;
                                 // extend max_depth if it didn't take long enough
-                                if dt < Duration::from_millis(2000) {
+                                if dt < Duration::from_millis(1500) {
                                     max_depth += 1;
                                 }
                             }
