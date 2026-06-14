@@ -226,8 +226,6 @@ fn start_uci() {
                         } else if let Some(&fallback_move) = moves.choose(&mut rng) {
                             println!("bestmove {}", move_to_uci(fallback_move));
                         }
-
-                        println!("the score was: {final_eval}");
                     });
                 }
             }
