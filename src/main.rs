@@ -38,7 +38,7 @@ fn main() {
 }
 
 fn debug() {
-    let mut state = State::from_fen("r3kb1r/pbn4p/1p3p1p/7R/2Bp4/pN6/2K2PP1/4R3 b kq - 1 23");
+    let mut state = State::default();
 
     let moves = state.get_moves();
 
