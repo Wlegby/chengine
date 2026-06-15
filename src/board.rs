@@ -174,7 +174,8 @@ impl State {
         // 1. Pieces
         for sq in 0..64 {
             if let Some(piece) = self.pieces_list[sq] {
-                let color_idx = if piece.white { 0 } else { 1 };
+                // white is 1
+                let color_idx = if piece.white { 1 } else { 0 };
                 let piece_idx = piece._type.to_index();
                 hash ^= ZOBRIST.pieces[color_idx][piece_idx][sq];
             }
@@ -424,6 +425,7 @@ impl State {
             // not king moves
 
             // xor the from piece
+            // white is 1
             self.hash ^= ZOBRIST.pieces[self.white_to_move as usize][piece._type.to_index()][from];
 
             if to == old_en_passant.trailing_zeros() as usize && piece._type == PType::Pawn {
