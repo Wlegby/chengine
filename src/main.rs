@@ -166,17 +166,16 @@ fn start_uci() {
                         let time_start = Instant::now();
                         let mut nodes = 0;
 
-                        // Iterative Deepening: Search from depth 1 to 7
                         while depth < max_depth {
-                            // Search the rest of the tree single-threaded from here
                             let next_move = search(
                                 state,
                                 depth,
-                                -i32::MAX, // Starting with open alpha/beta windows
+                                -i32::MAX,
                                 i32::MAX,
                                 &stop_search_clone,
                                 &mut locked_tt,
                                 &mut nodes,
+                                true,
                             );
 
                             // If we were interrupted by a `stop` command, discard the

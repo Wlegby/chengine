@@ -165,6 +165,7 @@ pub fn search(
     stop_flag: &AtomicBool,
     tt: &mut TT,
     nodes: &mut u64,
+    is_root: bool,
 ) -> (Option<Move>, i32) {
     *nodes += 1;
 
@@ -184,12 +185,11 @@ pub fn search(
         if entry.hash == state.hash {
             tt_move = Some(entry.best_move);
             if entry.depth >= depth {
-                // Check if the stored bounds allow a safe cutoff
                 match entry.flag {
                     TTFlag::Exact => return (Some(entry.best_move), entry.score),
                     TTFlag::Alpha if entry.score <= alpha => return (Some(entry.best_move), alpha),
                     TTFlag::Beta if entry.score >= beta => return (Some(entry.best_move), beta),
-                    _ => {} // Window doesn't match, must search anyway
+                    _ => {}
                 }
             }
         }
@@ -211,17 +211,17 @@ pub fn search(
         (state.black, state.white)
     };
 
-    // Checkmate / Stalemate detection
     if scored_moves.is_empty() {
         let score = if board.king & other.attacks != 0 {
-            -(2_000_000_000 + depth as i32) // Prioritize shorter mates
+            -(2_000_000_000 + depth as i32)
         } else {
-            0 // Stalemate
+            0
         };
         return (None, score);
     }
 
     let mut best_move = None;
+    let mut best_moves: Vec<Move> = Vec::new();
     let mut max_eval = -i32::MAX;
     let old_alpha = alpha;
 
@@ -230,7 +230,6 @@ pub fn search(
             break;
         }
 
-        // Selection sort on the fly for move ordering
         let mut best_idx = i;
         let mut best_score = scored_moves[i].1;
         for j in (i + 1)..scored_moves.len() {
@@ -254,9 +253,27 @@ pub fn search(
             && board.attacks & other.king == 0
             && board.king & other.king == 0
         {
-            search(new_state, depth - 2, -beta, -alpha, stop_flag, tt, nodes)
+            search(
+                new_state,
+                depth - 2,
+                -beta,
+                -alpha,
+                stop_flag,
+                tt,
+                nodes,
+                false,
+            )
         } else {
-            search(new_state, depth - 1, -beta, -alpha, stop_flag, tt, nodes)
+            search(
+                new_state,
+                depth - 1,
+                -beta,
+                -alpha,
+                stop_flag,
+                tt,
+                nodes,
+                false,
+            )
         };
 
         let our_eval = -opponent_eval;
@@ -268,6 +285,12 @@ pub fn search(
         if our_eval > max_eval {
             max_eval = our_eval;
             best_move = Some(m);
+            if is_root && depth == 1 {
+                best_moves.clear();
+                best_moves.push(m);
+            }
+        } else if our_eval == max_eval && is_root && depth == 1 {
+            best_moves.push(m);
         }
 
         alpha = alpha.max(our_eval);
@@ -277,7 +300,13 @@ pub fn search(
         }
     }
 
-    // 5. Store result in Transposition Table if search wasn't aborted
+    if is_root && depth == 1 && !best_moves.is_empty() {
+        let mut rng = rand::rng();
+        if let Some(&random_best) = best_moves.choose(&mut rng) {
+            best_move = Some(random_best);
+        }
+    }
+
     if !stop_flag.load(Ordering::Relaxed) {
         if let Some(m) = best_move {
             let flag = if max_eval >= beta {
