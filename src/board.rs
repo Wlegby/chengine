@@ -233,10 +233,10 @@ impl State {
         white_count += (number_attacking_white - number_defended_black) * 100;
 
         if self.white.attacks & self.black.king != 0 {
-            white_count += 900
+            white_count += 100
         }
         if self.black.attacks & self.white.king != 0 {
-            black_count += 900
+            black_count += 100
         }
 
         for (idx, p) in self.pieces_list.iter().enumerate() {

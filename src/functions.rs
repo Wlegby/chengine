@@ -89,9 +89,9 @@ pub fn king_to_corner_endgame(king_square: usize, other_king_square: usize, endg
     let dist_kings_x = (self_x - other_x).abs();
     let dist_kings_y = (self_y - other_y).abs();
     let tot_dist_kings = dist_kings_x + dist_kings_y;
-    eval += 14 - tot_dist_kings;
+    eval += (14 - tot_dist_kings) * 10;
 
-    (eval as f32 * endgame * 10.) as i32
+    (eval as f32 * endgame * 5.) as i32
 }
 
 pub fn score_move(state: &State, m: Move, tt_move: Option<Move>) -> i32 {
