@@ -147,6 +147,12 @@ impl Default for State {
 }
 
 impl State {
+    pub fn post_move(&self, _move: Move) -> Self {
+        let mut state = self.clone();
+        state.make_move(_move);
+        state
+    }
+
     pub fn is_threefold_repetition(&self) -> bool {
         // if less than 4 moves it's impossible
         if self.history_idx < 4 {

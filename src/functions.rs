@@ -526,8 +526,7 @@ pub fn fen_pos_notation_to_sq_index(pos: &str) -> u64 {
         _ => panic!("Invalid position"),
     };
 
-    let idx = (col + row * 8) as u64;
-    idx
+    (col + row * 8) as u64 // the idx
 }
 
 pub fn fen_positions_to_bitboards(

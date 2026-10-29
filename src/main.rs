@@ -37,16 +37,31 @@ fn main() {
     // debug();
 }
 
-fn debug() {
+fn debug() {}
+
+fn launch_perft() {
+    fn perft(depth: u32, mut state: State) -> u32 {
+        if depth == 0 {
+            return 1;
+        }
+
+        let mut total_moves = 0;
+
+        let moves = state.get_moves();
+
+        for m in moves {
+            total_moves += perft(depth - 1, state.post_move(m));
+        }
+
+        total_moves
+    }
+
     let mut state = State::default();
 
-    let moves = state.get_moves();
+    for depth in 1..10 {
+        let num_leaf = perft(depth, state);
 
-    display_bit_board(state.all_pieces);
-    display_bit_board(state.white.attacks);
-
-    for m in moves {
-        display_move(m);
+        println!("Depth: {depth}\nLeaves: {num_leaf}");
     }
 }
 
