@@ -1,3 +1,3 @@
 # chengine
 
-A simple (deterministic) chess engine based on the UCI interface
+A simple chess engine based on the UCI interface
