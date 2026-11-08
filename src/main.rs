@@ -33,11 +33,19 @@ use crate::tt::TT;
 include!(concat!(env!("OUT_DIR"), "/tables.rs"));
 
 fn main() {
-    start_uci();
-    // debug();
+    // start_uci();
+    debug();
+    // launch_perft();
 }
 
-fn debug() {}
+fn debug() {
+    let mut state = State::from_fen("k7/2p5/5p2/3N4/1P6/4P3/8/K7 w - - 0 1");
+
+    let (b, a) = state.get_legal_move_board(35, PType::Knight, true);
+
+    display_bit_board(b);
+    display_bit_board(a);
+}
 
 fn launch_perft() {
     fn perft(depth: u32, mut state: State) -> u32 {

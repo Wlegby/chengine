@@ -794,14 +794,11 @@ impl State {
 
         let pos_board = 1 << pos_idx;
 
-        let a: u64 = 0x0101010101010101;
-        let h: u64 = a << 7;
-
         if only_all_attacks {
             return if white {
-                ((pos_board & !a) << 7 | ((pos_board & !h) << 9))
+                WHITE_EMPTY_PSEUDO_PAWN_ATTACK[pos_idx as usize]
             } else {
-                ((pos_board & !h) >> 7 | ((pos_board & !a) >> 9))
+                BLACK_EMPTY_PSEUDO_PAWN_ATTACK[pos_idx as usize]
             };
         }
 
@@ -821,9 +818,9 @@ impl State {
 
         // attacks
         moves |= if white {
-            ((pos_board & !a) << 7 | ((pos_board & !h) << 9)) & (self.black.all | self.en_passant)
+            WHITE_EMPTY_PSEUDO_PAWN_ATTACK[pos_idx as usize] & (self.black.all | self.en_passant)
         } else {
-            ((pos_board & !h) >> 7 | ((pos_board & !a) >> 9)) & (self.white.all | self.en_passant)
+            BLACK_EMPTY_PSEUDO_PAWN_ATTACK[pos_idx as usize] & (self.white.all | self.en_passant)
         };
 
         moves

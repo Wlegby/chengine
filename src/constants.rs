@@ -5,6 +5,11 @@ use crate::{
     functions::{remove_border, remove_border_rook},
 };
 
+const PSEUDO_PAWN_ATTACK: ([u64; 64], [u64; 64]) = get_pseudo_pawn_attack();
+
+pub const WHITE_EMPTY_PSEUDO_PAWN_ATTACK: [u64; 64] = PSEUDO_PAWN_ATTACK.0;
+pub const BLACK_EMPTY_PSEUDO_PAWN_ATTACK: [u64; 64] = PSEUDO_PAWN_ATTACK.1;
+
 pub const EMPTY_PSEUDO_ROOK: [u64; 64] = generate_pseudo_rook();
 pub const EMPTY_PSEUDO_BISHOP: [u64; 64] = generate_pseudo_bishop();
 pub const EMPTY_PSEUDO_KNIGHT: [u64; 64] = generate_pseudo_knight();
@@ -405,4 +410,29 @@ const fn generate_pseudo_rook() -> [u64; 64] {
     }
 
     ray_attacks
+}
+
+const fn get_pseudo_pawn_attack() -> ([u64; 64], [u64; 64]) {
+    let mut white = [0; 64];
+    let mut black = [0; 64];
+
+    let mut i = 0;
+    while i < 64 {
+        let pos_board = 1 << i;
+
+        let mut white_moves: u64 = 0;
+        let mut black_moves: u64 = 0;
+
+        let a: u64 = 0x0101010101010101;
+        let h: u64 = a << 7;
+
+        white_moves |= (pos_board & !a) << 7 | (pos_board & !h) << 9;
+        black_moves |= (pos_board & !h) >> 7 | (pos_board & !a) >> 9;
+
+        white[i] = white_moves;
+        black[i] = black_moves;
+
+        i += 1;
+    }
+    (white, black)
 }
