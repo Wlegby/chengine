@@ -616,11 +616,9 @@ pub fn fen_positions_to_bitboards(
 }
 
 pub fn format_uci_score(score: i32, depth: u8) -> String {
-    let mate_threshold = 900_000; // Example threshold
-                                  //
+    let mate_threshold = 900_000; // example threshold
     if score > mate_threshold {
         // Engine is delivering mate.
-        // Note: To get the exact moves until mate, you need to track
         // distance-from-root (ply) in your search function.
         let mate_in = (score - 2_000_000_000 + 1) / 2;
         format!("mate {}", 4 - mate_in.abs())

@@ -66,7 +66,7 @@ pub fn get_moves_from_move_board(
         let trail = move_board.trailing_zeros();
         indices.push(trail);
 
-        // Clear the lowest set bit (Brian Kernighan's algorithm)
+        // Clear the lowest set bit
         move_board &= move_board - 1;
     }
 

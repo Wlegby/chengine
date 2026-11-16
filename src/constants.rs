@@ -169,7 +169,7 @@ pub struct ZobristKeys {
 }
 
 const fn generate_zobrist() -> ZobristKeys {
-    // A simple Xorshift PRNG to generate random numbers at compile time
+    // A simple XORshift PRNG to generate random numbers at compile time
     let mut seed: u64 = 0x98f1071585ceeb0a;
 
     let mut pieces = [[[0; 64]; 6]; 2];
