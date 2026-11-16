@@ -438,19 +438,16 @@ pub fn pext(blockers: u64, moves: u64) -> u64 {
     if is_x86_feature_detected!("bmi2") {
         unsafe {
             return _pext_u64(blockers, moves);
-            // Result: 1001 (Extracts bits 7, 6, 1, and 0 from value)
         }
     } else {
         let mut hash = 0;
 
         let mut c = 0;
-        let mut i = 0;
-        while i < 64 {
+        for i in 0..64 {
             if (moves >> i) & 1 == 1 {
                 hash |= ((blockers >> i) & 1) << c;
                 c += 1;
             }
-            i += 1;
         }
 
         hash
