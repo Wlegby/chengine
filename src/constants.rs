@@ -157,6 +157,7 @@ pub const BLACK_KING: [i32; 64] = [
     8, 10, 7, 4, 4, 5, 10, 8, // Rank 8
 ];
 
+// (ray between points, ray intersecting both points)
 pub const RAY_BETWEEN: ([[u64; 64]; 64], [[u64; 64]; 64]) = init_ray_between();
 
 pub const ZOBRIST: ZobristKeys = generate_zobrist();
