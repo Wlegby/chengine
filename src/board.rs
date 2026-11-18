@@ -659,10 +659,10 @@ impl State {
     }
 
     pub fn get_pins(&self, white: bool) -> Vec<usize> {
-        let king_idx = if white {
-            self.white.king.trailing_zeros() as usize
+        let (king_idx, own_pieces) = if white {
+            (self.white.king.trailing_zeros() as usize, self.white.all)
         } else {
-            self.black.king.trailing_zeros() as usize
+            (self.black.king.trailing_zeros() as usize, self.black.all)
         };
 
         let king_straight = EMPTY_PSEUDO_ROOK[king_idx];
@@ -696,7 +696,7 @@ impl State {
                 remove_border_rook(EMPTY_PSEUDO_ROOK[idx], idx as u8),
             ) as usize];
 
-            if moves & king_s_b != 0 {
+            if moves & king_s_b & own_pieces != 0 {
                 pins.push((moves & king_s_b).trailing_zeros() as usize);
             }
             rook &= rook - 1;
@@ -706,7 +706,9 @@ impl State {
             let moves = BLOCKED_BISHOP[idx]
                 [pext(self.all_pieces, remove_border(EMPTY_PSEUDO_BISHOP[idx])) as usize];
 
-            pins.push((moves & king_d_b).trailing_zeros() as usize);
+            if moves & king_d_b & own_pieces != 0 {
+                pins.push((moves & king_d_b & own_pieces).trailing_zeros() as usize);
+            }
 
             bishop &= bishop - 1;
         }
@@ -719,7 +721,12 @@ impl State {
                     remove_border_rook(EMPTY_PSEUDO_ROOK[idx], idx as u8),
                 ) as usize];
 
-            pins.push((moves & king_a_b & RAY_BETWEEN.0[king_idx][idx]).trailing_zeros() as usize);
+            if moves & king_a_b & RAY_BETWEEN.0[king_idx][idx] & own_pieces != 0 {
+                pins.push(
+                    (moves & king_a_b & RAY_BETWEEN.0[king_idx][idx] & own_pieces).trailing_zeros()
+                        as usize,
+                );
+            }
 
             queen &= queen - 1;
         }
